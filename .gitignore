@@ -4,7 +4,7 @@
 
 # Java / Spring Boot
 core-api/target/
-core-api/.mvn/
+core-api/.mvn/wrapper/maven-wrapper.jar
 core-api/*.iml
 core-api/.idea/
 
