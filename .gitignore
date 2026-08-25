@@ -1,0 +1,35 @@
+# env / secrets
+.env
+*.env.local
+
+# Java / Spring Boot
+core-api/target/
+core-api/.mvn/
+core-api/*.iml
+core-api/.idea/
+
+# Python / FastAPI
+ml-service/.venv/
+ml-service/__pycache__/
+ml-service/**/__pycache__/
+ml-service/*.egg-info/
+ml-service/models/
+
+# Node.js
+realtime-service/node_modules/
+realtime-service/npm-debug.log*
+
+# Flutter
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.pub-cache/
+mobile/.pub/
+mobile/**/generated_plugin_registrant.dart
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

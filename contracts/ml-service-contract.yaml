@@ -1,0 +1,431 @@
+openapi: 3.0.3
+info:
+  title: SIH26090 - ML Inference Service (FastAPI)
+  description: >
+    Owned by the Python Developer (serving/infra) wrapping models from the
+    ML Developer. Called only by the Spring Boot orchestration layer -
+    never directly by Flutter, Node.js, or end users. Each capability is
+    its own endpoint with a clear input/output schema rather than one
+    monolithic "do everything" endpoint, so failures are isolated and
+    each piece can be tested independently.
+
+    Typical flow after Spring Boot creates a PENDING listing:
+      1. POST /v1/image/enhance          (async)
+      2. POST /v1/audio/transcribe       (async, can run in parallel with #1)
+      3. POST /v1/text/translate         (after #2 completes)
+      4. POST /v1/text/generate-description
+      5. POST /v1/price/suggest
+    Spring Boot may call these sequentially or fan out in parallel where
+    there's no dependency, then POST the combined result back to
+    /internal/ml-callback/{listingId} on the Spring Boot API.
+  version: "0.1.0"
+
+servers:
+  - url: https://ml.sih26090.local/v1
+    description: Local/dev placeholder - replace with actual deployed URL
+
+tags:
+  - name: Image
+  - name: Audio
+  - name: Text
+  - name: Pricing
+  - name: Health
+
+paths:
+  # ------------------------------------------------------------------
+  # HEALTH
+  # ------------------------------------------------------------------
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness/readiness check for deployment and demo-day sanity checks
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  modelsLoaded:
+                    type: array
+                    items:
+                      type: string
+                    example: ["image_enhance", "asr_whisper", "translate_indictrans2", "pricing_xgb"]
+
+  # ------------------------------------------------------------------
+  # IMAGE
+  # ------------------------------------------------------------------
+  /image/enhance:
+    post:
+      tags: [Image]
+      summary: >
+        Clean up a raw product photo: background removal/cleanup, lighting
+        correction, cropping/formatting to e-commerce standards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageEnhanceRequest"
+      responses:
+        "200":
+          description: Enhanced image produced synchronously (small/fast case)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageEnhanceResult"
+        "202":
+          description: Accepted for async processing - poll /image/enhance/{jobId}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobAccepted"
+
+  /image/enhance/{jobId}:
+    get:
+      tags: [Image]
+      summary: Poll status/result of an async image enhancement job
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Job status and result if complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageEnhanceJobStatus"
+
+  # ------------------------------------------------------------------
+  # AUDIO
+  # ------------------------------------------------------------------
+  /audio/transcribe:
+    post:
+      tags: [Audio]
+      summary: >
+        Transcribe a regional-language voice note to text (ASR). Returns
+        the raw transcript plus detected language - does NOT translate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeRequest"
+      responses:
+        "200":
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeResult"
+        "202":
+          description: Accepted for async processing - poll /audio/transcribe/{jobId}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobAccepted"
+
+  /audio/transcribe/{jobId}:
+    get:
+      tags: [Audio]
+      summary: Poll status/result of an async transcription job
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Job status and result if complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeJobStatus"
+
+  # ------------------------------------------------------------------
+  # TEXT
+  # ------------------------------------------------------------------
+  /text/translate:
+    post:
+      tags: [Text]
+      summary: Translate transcribed/raw text between a regional language, Hindi, and English
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslateRequest"
+      responses:
+        "200":
+          description: Translation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslateResult"
+
+  /text/generate-description:
+    post:
+      tags: [Text]
+      summary: >
+        Generate a short, factual, SEO-friendly bilingual (English + Hindi)
+        product description from translated transcript text and basic
+        product metadata. Prompt-engineered LLM call constrained to avoid
+        fabricating details not present in the source text.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DescriptionRequest"
+      responses:
+        "200":
+          description: Generated descriptions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DescriptionResult"
+
+  # ------------------------------------------------------------------
+  # PRICING
+  # ------------------------------------------------------------------
+  /price/suggest:
+    post:
+      tags: [Pricing]
+      summary: >
+        Suggest a competitive price range using image features, category,
+        description, material cost, and aggregated market reference data.
+        Returns an explainable breakdown, not just a number - judges and
+        artisans should be able to see why.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceSuggestRequest"
+      responses:
+        "200":
+          description: Suggested price range with explanation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceSuggestResult"
+
+components:
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    JobAccepted:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        statusUrl:
+          type: string
+          example: "/v1/image/enhance/8f14e-..."
+        estimatedSeconds:
+          type: integer
+          example: 8
+
+    # ---------------- IMAGE ----------------
+    ImageEnhanceRequest:
+      type: object
+      required: [imageUrl]
+      properties:
+        imageUrl:
+          type: string
+          format: uri
+          description: URL of the raw uploaded product photo (S3/Firebase)
+        listingId:
+          type: string
+          format: uuid
+          description: Passed through so Spring Boot can correlate async results
+
+    ImageEnhanceResult:
+      type: object
+      properties:
+        enhancedImageUrl:
+          type: string
+          format: uri
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        appliedSteps:
+          type: array
+          items:
+            type: string
+          example: ["background_removal", "lighting_correction", "crop_to_standard"]
+
+    ImageEnhanceJobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [QUEUED, PROCESSING, SUCCESS, FAILED]
+        result:
+          $ref: "#/components/schemas/ImageEnhanceResult"
+        errorMessage:
+          type: string
+          nullable: true
+
+    # ---------------- AUDIO ----------------
+    TranscribeRequest:
+      type: object
+      required: [audioUrl]
+      properties:
+        audioUrl:
+          type: string
+          format: uri
+        listingId:
+          type: string
+          format: uuid
+        hintLanguage:
+          type: string
+          description: Optional artisan-selected language hint to speed up/improve ASR accuracy
+          example: "hi"
+
+    TranscribeResult:
+      type: object
+      properties:
+        transcript:
+          type: string
+        detectedLanguage:
+          type: string
+          example: "raj"
+          description: ISO or internal language code for the detected regional language
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    TranscribeJobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [QUEUED, PROCESSING, SUCCESS, FAILED]
+        result:
+          $ref: "#/components/schemas/TranscribeResult"
+        errorMessage:
+          type: string
+          nullable: true
+
+    # ---------------- TEXT ----------------
+    TranslateRequest:
+      type: object
+      required: [text, sourceLanguage, targetLanguages]
+      properties:
+        text:
+          type: string
+        sourceLanguage:
+          type: string
+          example: "raj"
+        targetLanguages:
+          type: array
+          items:
+            type: string
+          example: ["en", "hi"]
+
+    TranslateResult:
+      type: object
+      properties:
+        translations:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            en: "Handcrafted blue pottery vase with floral motif"
+            hi: "फूलों की नक्काशी वाला हस्तनिर्मित ब्लू पॉटरी फूलदान"
+
+    DescriptionRequest:
+      type: object
+      required: [translatedTextEn, category]
+      properties:
+        translatedTextEn:
+          type: string
+          description: English translation of the artisan's voice note, used as the factual source
+        category:
+          type: string
+          example: "Pottery"
+        keywords:
+          type: array
+          items:
+            type: string
+          description: Optional extra keywords to bias the SEO-friendly copy
+          example: ["handmade", "blue pottery", "Jaipur"]
+
+    DescriptionResult:
+      type: object
+      properties:
+        descriptionEn:
+          type: string
+        descriptionHi:
+          type: string
+        seoKeywords:
+          type: array
+          items:
+            type: string
+
+    # ---------------- PRICING ----------------
+    PriceSuggestRequest:
+      type: object
+      required: [category]
+      properties:
+        listingId:
+          type: string
+          format: uuid
+        category:
+          type: string
+          example: "Pottery"
+        enhancedImageUrl:
+          type: string
+          format: uri
+          description: Used for basic visual features (size/complexity proxy), not deep visual pricing in v1
+        descriptionEn:
+          type: string
+        materialCost:
+          type: number
+          format: float
+          description: Optional artisan-provided raw material cost - strong signal when available
+        region:
+          type: string
+          example: "Rajasthan"
+          description: Used to weight regional market reference data
+
+    PriceSuggestResult:
+      type: object
+      properties:
+        suggestedPriceMin:
+          type: number
+          format: float
+        suggestedPriceMax:
+          type: number
+          format: float
+        currency:
+          type: string
+          default: "INR"
+        explanation:
+          type: string
+          description: Short, human-readable justification - keep the model explainable for the demo
+          example: "Based on similar handmade blue pottery items (₹450-700) and a ₹150 material cost input."
+        featuresUsed:
+          type: array
+          items:
+            type: string
+          example: ["category_avg_price", "material_cost", "regional_demand_index"]

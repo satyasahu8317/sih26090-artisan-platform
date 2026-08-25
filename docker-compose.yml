@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sih26090
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  core-api:
+    build: ./core-api
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./core-api/.env
+
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./ml-service/.env
+
+  realtime-service:
+    build: ./realtime-service
+    depends_on:
+      - core-api
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./realtime-service/.env
+
+volumes:
+  postgres-data:

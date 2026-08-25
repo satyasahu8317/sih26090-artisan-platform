@@ -1,0 +1,711 @@
+openapi: 3.0.3
+info:
+  title: SIH26090 - Artisan Market Linkage Platform API
+  description: >
+    Core API contract owned by the Spring Boot service. Flutter (mobile app),
+    Node.js (realtime/WhatsApp), and Python (ML inference) all integrate
+    against this contract. Spring Boot is the only service that talks
+    directly to the database - Python and Node.js are stateless workers
+    called by this layer.
+  version: "0.1.0"
+
+servers:
+  - url: https://api.sih26090.local/v1
+    description: Local/dev placeholder - replace with actual deployed URL
+
+tags:
+  - name: Auth
+  - name: Artisan
+  - name: Catalog
+  - name: Upload
+  - name: Orders
+  - name: Admin
+  - name: Ingestion
+    description: Internal endpoints called by Node.js (WhatsApp) and Python (ML callbacks)
+
+paths:
+  # ------------------------------------------------------------------
+  # AUTH
+  # ------------------------------------------------------------------
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user (artisan, buyer, or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: User already exists
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: Request an OTP for phone-based login (primary flow for artisans)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber:
+                  type: string
+                  example: "+919812345678"
+      responses:
+        "200":
+          description: OTP sent
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, otp]
+              properties:
+                phoneNumber:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid or expired OTP
+
+  # ------------------------------------------------------------------
+  # ARTISAN PROFILE
+  # ------------------------------------------------------------------
+  /artisans/me:
+    get:
+      tags: [Artisan]
+      summary: Get the logged-in artisan's profile
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Artisan profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtisanProfile"
+    put:
+      tags: [Artisan]
+      summary: Update the logged-in artisan's profile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtisanProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtisanProfile"
+
+  /artisans/{artisanId}/schemes:
+    get:
+      tags: [Artisan]
+      summary: Get government scheme suggestions matched to this artisan (stretch goal)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ArtisanId"
+      responses:
+        "200":
+          description: List of matched schemes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SchemeMatch"
+
+  # ------------------------------------------------------------------
+  # UPLOAD
+  # ------------------------------------------------------------------
+  /uploads/init:
+    post:
+      tags: [Upload]
+      summary: >
+        Request a signed upload URL for a raw asset (product photo or voice note).
+        Flutter calls this before uploading directly to storage (S3/Firebase).
+        Also used by the Node.js WhatsApp relay for media forwarded from artisans.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assetType, fileExtension]
+              properties:
+                assetType:
+                  type: string
+                  enum: [PRODUCT_IMAGE, VOICE_NOTE]
+                fileExtension:
+                  type: string
+                  example: "jpg"
+      responses:
+        "200":
+          description: Signed upload URL and asset reference
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assetId:
+                    type: string
+                    format: uuid
+                  uploadUrl:
+                    type: string
+                    format: uri
+                  expiresInSeconds:
+                    type: integer
+                    example: 900
+
+  /uploads/{assetId}/complete:
+    post:
+      tags: [Upload]
+      summary: Confirm that the asset upload finished (client calls after PUT to uploadUrl)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Asset marked complete
+
+  # ------------------------------------------------------------------
+  # CATALOG
+  # ------------------------------------------------------------------
+  /catalog/listings:
+    post:
+      tags: [Catalog]
+      summary: >
+        Create a new draft listing from an uploaded photo + voice note.
+        This triggers the async ML pipeline (image enhancement, ASR,
+        translation, description generation, pricing).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageAssetId, voiceAssetId]
+              properties:
+                imageAssetId:
+                  type: string
+                  format: uuid
+                voiceAssetId:
+                  type: string
+                  format: uuid
+                category:
+                  type: string
+                  example: "Pottery"
+                materialCost:
+                  type: number
+                  format: float
+                  description: Optional artisan-provided raw material cost, used as a pricing model feature
+      responses:
+        "202":
+          description: Listing created in PENDING status; processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+
+    get:
+      tags: [Catalog]
+      summary: Browse/search published listings (buyer-facing)
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Paged list of published listings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Listing"
+
+  /catalog/listings/{listingId}:
+    get:
+      tags: [Catalog]
+      summary: Get a single listing (includes status and ML-generated fields once ready)
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      responses:
+        "200":
+          description: Listing detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+        "404":
+          description: Not found
+
+    patch:
+      tags: [Catalog]
+      summary: >
+        Artisan edits the AI-generated description/price before publishing,
+        or changes listing status (e.g. READY -> PUBLISHED).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListingUpdate"
+      responses:
+        "200":
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+
+  # ------------------------------------------------------------------
+  # ORDERS
+  # ------------------------------------------------------------------
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Buyer places an order for a published listing
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listingId, quantity]
+              properties:
+                listingId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+    get:
+      tags: [Orders]
+      summary: List orders for the logged-in user (artisan sees incoming, buyer sees placed)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /orders/{orderId}/status:
+    patch:
+      tags: [Orders]
+      summary: Update order status (artisan confirms/ships, triggers Node.js notification)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
+      responses:
+        "200":
+          description: Order updated
+
+  # ------------------------------------------------------------------
+  # INGESTION (internal - called by Node.js and Python)
+  # ------------------------------------------------------------------
+  /internal/ingestion/whatsapp:
+    post:
+      tags: [Ingestion]
+      summary: >
+        Called by the Node.js WhatsApp relay when an artisan sends a photo +
+        voice note over WhatsApp. Creates a draft listing the same way
+        /catalog/listings does, but resolves the artisan by phone number
+        instead of a JWT.
+      security: [{ internalApiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, imageAssetId, voiceAssetId]
+              properties:
+                phoneNumber:
+                  type: string
+                imageAssetId:
+                  type: string
+                  format: uuid
+                voiceAssetId:
+                  type: string
+                  format: uuid
+      responses:
+        "202":
+          description: Draft listing created and processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+
+  /internal/ml-callback/{listingId}:
+    post:
+      tags: [Ingestion]
+      summary: >
+        Called by the Python FastAPI service when ML processing for a listing
+        finishes (image enhancement, transcription, translation, description,
+        price suggestion). Spring Boot persists the results and flips the
+        listing to READY, then asks Node.js to notify the artisan.
+      security: [{ internalApiKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MlCallbackPayload"
+      responses:
+        "200":
+          description: Listing updated to READY
+
+  # ------------------------------------------------------------------
+  # ADMIN
+  # ------------------------------------------------------------------
+  /admin/artisans:
+    get:
+      tags: [Admin]
+      summary: List all onboarded artisans (admin panel)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: List of artisans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtisanProfile"
+
+  /admin/artisans/{artisanId}/verify:
+    post:
+      tags: [Admin]
+      summary: Verify an artisan's trust badge (Aadhaar-linked ID / GI-tag check - stretch goal)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ArtisanId"
+      responses:
+        "200":
+          description: Artisan marked as verified
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-Api-Key
+      description: Shared secret used only by Node.js and Python services, never exposed to the client apps
+
+  parameters:
+    ArtisanId:
+      name: artisanId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ListingId:
+      name: listingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [phoneNumber, role]
+      properties:
+        phoneNumber:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [ARTISAN, BUYER, ADMIN]
+        preferredLanguage:
+          type: string
+          example: "hi"
+
+    LoginRequest:
+      type: object
+      required: [phoneNumber, password]
+      properties:
+        phoneNumber:
+          type: string
+        password:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [ARTISAN, BUYER, ADMIN]
+
+    ArtisanProfile:
+      type: object
+      properties:
+        artisanId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phoneNumber:
+          type: string
+        preferredLanguage:
+          type: string
+        craftCategory:
+          type: string
+          example: "Blue Pottery"
+        location:
+          type: string
+          example: "Jaipur, Rajasthan"
+        isVerified:
+          type: boolean
+          description: Trust badge status (stretch goal)
+        clusterId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Group-selling cluster, if part of one (stretch goal)
+
+    ArtisanProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        preferredLanguage:
+          type: string
+        craftCategory:
+          type: string
+        location:
+          type: string
+
+    SchemeMatch:
+      type: object
+      properties:
+        schemeName:
+          type: string
+        description:
+          type: string
+        eligibilityReason:
+          type: string
+        applyUrl:
+          type: string
+          format: uri
+
+    Listing:
+      type: object
+      properties:
+        listingId:
+          type: string
+          format: uuid
+        artisanId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, READY, PUBLISHED, FAILED]
+        category:
+          type: string
+        rawImageUrl:
+          type: string
+          format: uri
+        enhancedImageUrl:
+          type: string
+          format: uri
+          nullable: true
+        descriptionEn:
+          type: string
+          nullable: true
+        descriptionHi:
+          type: string
+          nullable: true
+        suggestedPriceMin:
+          type: number
+          format: float
+          nullable: true
+        suggestedPriceMax:
+          type: number
+          format: float
+          nullable: true
+        finalPrice:
+          type: number
+          format: float
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ListingUpdate:
+      type: object
+      properties:
+        descriptionEn:
+          type: string
+        descriptionHi:
+          type: string
+        finalPrice:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [READY, PUBLISHED]
+
+    MlCallbackPayload:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [SUCCESS, PARTIAL, FAILED]
+        enhancedImageUrl:
+          type: string
+          format: uri
+        transcript:
+          type: string
+          description: Raw ASR transcript before translation
+        descriptionEn:
+          type: string
+        descriptionHi:
+          type: string
+        suggestedPriceMin:
+          type: number
+          format: float
+        suggestedPriceMax:
+          type: number
+          format: float
+        errorMessage:
+          type: string
+          nullable: true
+          description: Populated when status is PARTIAL or FAILED
+
+    Order:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        listingId:
+          type: string
+          format: uuid
+        buyerId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
+        createdAt:
+          type: string
+          format: date-time

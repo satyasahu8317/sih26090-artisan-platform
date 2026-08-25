@@ -1,0 +1,26 @@
+name: realtime-service CI
+
+on:
+  push:
+    paths:
+      - "realtime-service/**"
+      - "contracts/nodejs-service-contract.yaml"
+  pull_request:
+    paths:
+      - "realtime-service/**"
+      - "contracts/nodejs-service-contract.yaml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: realtime-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm install
+      - run: npm test --if-present
