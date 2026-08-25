@@ -6,6 +6,15 @@ This roadmap operationalizes the charter (`Srijan.pdf`) and the three OpenAPI co
 
 ---
 
+## 0. Alignment check against the official SIH26090 problem statement
+
+Cross-checked against the official MoSJE problem statement text (not just the internal charter). The charter and contracts already match it closely — mandatory features, impact goals, and the cross-platform + scalable-backend framing all line up. Two things the official text calls out that deserve explicit attention rather than assumption:
+
+1. **"Connect directly with larger B2B buyers or government e-marketplaces" is in the official *Expected Solution* section, not just an impact goal.** In our plan this maps to ONDC integration, currently filed under Section 2's stretch goals — lower priority than the WhatsApp bot and offline-first differentiators. Because this phrase is in the *expected solution* of the actual PS, judges may specifically look for it. **Open decision for the team:** does at least a mocked/minimal ONDC or B2B-buyer-facing connector need to move up in priority, even a thin version, rather than staying last in the stretch-goal queue? Buyer-side catalog browse/orders already covers generic "connect to buyers" — what's not covered yet is the specific government e-marketplace (ONDC) angle the PS names. Flag this at the next standup rather than deciding unilaterally.
+2. **UI/UX language from the official PS is more specific than our internal brief captured:** *"a highly responsive, minimalist UI/UX design (incorporating modern, clean visual hierarchies and accessible layouts)."* This is a slightly different bar than just "usable for low-literacy users" — it also signals judges will score visual polish and modern design language, not only accessibility. Feed this quote directly to the UI/UX designer (see Section 3, Phase 0).
+
+---
+
 ## 1. Guiding principles
 
 1. **Contracts before code.** Nobody writes business logic against a guessed shape of another service's API. The three YAML contracts are frozen after Hour 6 sign-off; changes go through a standup flag, not a silent edit.
@@ -50,7 +59,7 @@ Every link in that chain is owned by a different person. This is why WhatsApp sa
 | Python | Scaffold FastAPI project. Stub all 5 endpoints (`/image/enhance`, `/audio/transcribe`, `/text/translate`, `/text/generate-description`, `/price/suggest`) returning hardcoded-but-schema-correct responses. |
 | Node.js | Scaffold Express project. **Start Meta WhatsApp Business sandbox registration now** — this has unpredictable external latency and must not be the long pole later. Stub `/health`, `/notifications/register-device`. |
 | ML Developer | Pull and smoke-test `rembg`, Whisper (or IndicWhisper), IndicTrans2/NLLB locally. Confirm they run on available hardware before committing to them in the demo. |
-| UI/UX | Deliver low-fi wireframes for: onboarding, capture flow, review-and-publish screen, WhatsApp bot script. |
+| UI/UX | Deliver low-fi wireframes for: onboarding, capture flow, review-and-publish screen, WhatsApp bot script. Design brief per the official PS wording: *"a highly responsive, minimalist UI/UX design (incorporating modern, clean visual hierarchies and accessible layouts)"* — treat modern/clean visual polish as a real scoring criterion, not secondary to accessibility. |
 
 **Exit criteria:** All 3 contracts committed to repo. Every service has a `/health` endpoint returning 200.
 
@@ -163,6 +172,7 @@ This is where mocks get torn out. Sequence matters — build the chain in this o
 | Offline sync edge cases (dup submits, partial uploads) | Medium | Explicit airplane-mode test pass in Phase 2, not deferred to Phase 4 |
 | Pricing model has no real market data | High (expected) | Ship explainable baseline early per charter guidance; refine only if time allows, never block on it |
 | Scope creep into stretch goals before ★ priorities are solid | Medium | Hour 40 scope freeze; stretch goals explicitly sequenced after WhatsApp + offline |
+| Missing the PS's explicit "B2B buyers / govt e-marketplace" ask because ONDC sits last in stretch goals | Medium | See Section 0, item 1 — needs an explicit team decision, not a default deprioritization |
 
 ---
 
