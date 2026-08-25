@@ -14,6 +14,7 @@ ml-service/__pycache__/
 ml-service/**/__pycache__/
 ml-service/*.egg-info/
 ml-service/models/
+ml-service/.pytest_cache/
 
 # Node.js
 realtime-service/node_modules/

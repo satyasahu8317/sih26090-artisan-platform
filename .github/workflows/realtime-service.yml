@@ -22,5 +22,5 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-      - run: npm install
-      - run: npm test --if-present
+      - run: npm ci
+      - run: npm test
