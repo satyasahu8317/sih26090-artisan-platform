@@ -11,7 +11,7 @@ on:
       - "contracts/springboot-api-contract.yaml"
 
 jobs:
-  build-and-test:
+  core-api-build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:
