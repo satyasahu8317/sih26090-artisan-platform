@@ -30,3 +30,4 @@ src/main/java/com/sih26090/coreapi/
 Copy `.env.example` to `.env` and fill in:
 - `INTERNAL_API_KEY` — shared secret with `ml-service` and `realtime-service`
 - `DB_URL`, `DB_USER`, `DB_PASSWORD`
+# ci test
