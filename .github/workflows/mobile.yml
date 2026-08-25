@@ -9,7 +9,7 @@ on:
       - "mobile/**"
 
 jobs:
-  build-and-test:
+  mobile-build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:

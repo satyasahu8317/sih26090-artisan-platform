@@ -11,7 +11,7 @@ on:
       - "contracts/ml-service-contract.yaml"
 
 jobs:
-  build-and-test:
+  ml-service-build-and-test:
     runs-on: ubuntu-latest
     defaults:
       run:
