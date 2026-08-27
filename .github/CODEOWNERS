@@ -1,11 +1,10 @@
 # Contract changes ripple across every service — require every dev's review.
-/contracts/ @spring-boot-dev @python-dev @nodejs-dev @flutter-dev @ml-dev
+/contracts/ @nodejs-dev @python-ml-dev @flutter-dev
 
 # Service-scoped ownership — adjust these GitHub usernames to your team's actual handles.
-/core-api/ @spring-boot-dev
-/ml-service/ @python-dev @ml-dev
-/realtime-service/ @nodejs-dev
+/backend-service/ @nodejs-dev
+/ml-service/ @python-ml-dev
 /mobile/ @flutter-dev
 
-/docker-compose.yml @spring-boot-dev @python-dev @nodejs-dev
-/ROADMAP.md @spring-boot-dev @python-dev @nodejs-dev @flutter-dev @ml-dev
+/docker-compose.yml @nodejs-dev @python-ml-dev
+/ROADMAP.md @nodejs-dev @python-ml-dev @flutter-dev

@@ -1,29 +1,66 @@
 openapi: 3.0.3
 info:
-  title: SIH26090 - Artisan Market Linkage Platform API
+  title: SIH26090 - Backend Service (Node.js)
   description: >
-    Core API contract owned by the Spring Boot service. Flutter (mobile app),
-    Node.js (realtime/WhatsApp), and Python (ML inference) all integrate
-    against this contract. Spring Boot is the only service that talks
-    directly to the database - Python and Node.js are stateless workers
-    called by this layer.
-  version: "0.1.0"
+    Unified backend for the SIH26090 artisan platform. Owned by the Node.js
+    Developer. This is the only service that talks directly to the database -
+    it owns auth, artisan/catalog/order CRUD, the admin panel, WhatsApp
+    Business messaging, push notifications, and orchestration of the Python
+    ML inference calls. The Python service (`ml-service`) is a stateless
+    worker called by this layer; it owns no business data and never talks
+    to the database directly.
+
+    This service replaces what was originally split across a separate
+    Spring Boot API and a thin Node.js realtime/messaging service - the team
+    consolidated to one backend codebase to match actual headcount (one
+    Node.js developer, one Python/ML developer).
+
+    A few paths are NOT called by Flutter/buyers directly - they are invoked
+    by Meta's WhatsApp Cloud API and by the ML service itself:
+      - GET/POST /whatsapp/webhook       <- called by Meta (incoming artisan messages)
+      - POST /internal/ml-callback/{id}  <- called by ml-service (inference results)
+  version: "0.2.0"
 
 servers:
   - url: https://api.sih26090.local/v1
     description: Local/dev placeholder - replace with actual deployed URL
 
 tags:
+  - name: Health
   - name: Auth
   - name: Artisan
-  - name: Catalog
   - name: Upload
+  - name: Catalog
   - name: Orders
   - name: Admin
+  - name: WhatsApp
+  - name: Notifications
+  - name: Realtime
+  - name: ONDC
+    description: Stretch goal - webhook adapter, build only if time permits
   - name: Ingestion
-    description: Internal endpoints called by Node.js (WhatsApp) and Python (ML callbacks)
+    description: Internal endpoints called by Meta (WhatsApp) and the ml-service (inference callbacks)
 
 paths:
+  # ------------------------------------------------------------------
+  # HEALTH
+  # ------------------------------------------------------------------
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
   # ------------------------------------------------------------------
   # AUTH
   # ------------------------------------------------------------------
@@ -171,7 +208,7 @@ paths:
       summary: >
         Request a signed upload URL for a raw asset (product photo or voice note).
         Flutter calls this before uploading directly to storage (S3/Firebase).
-        Also used by the Node.js WhatsApp relay for media forwarded from artisans.
+        Also used by this service's own WhatsApp relay for media forwarded from artisans.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -230,7 +267,7 @@ paths:
       summary: >
         Create a new draft listing from an uploaded photo + voice note.
         This triggers the async ML pipeline (image enhancement, ASR,
-        translation, description generation, pricing).
+        translation, description generation, pricing) via calls to ml-service.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -373,7 +410,7 @@ paths:
   /orders/{orderId}/status:
     patch:
       tags: [Orders]
-      summary: Update order status (artisan confirms/ships, triggers Node.js notification)
+      summary: Update order status (artisan confirms/ships, triggers a notification dispatch)
       security: [{ bearerAuth: [] }]
       parameters:
         - name: orderId
@@ -396,63 +433,6 @@ paths:
       responses:
         "200":
           description: Order updated
-
-  # ------------------------------------------------------------------
-  # INGESTION (internal - called by Node.js and Python)
-  # ------------------------------------------------------------------
-  /internal/ingestion/whatsapp:
-    post:
-      tags: [Ingestion]
-      summary: >
-        Called by the Node.js WhatsApp relay when an artisan sends a photo +
-        voice note over WhatsApp. Creates a draft listing the same way
-        /catalog/listings does, but resolves the artisan by phone number
-        instead of a JWT.
-      security: [{ internalApiKey: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [phoneNumber, imageAssetId, voiceAssetId]
-              properties:
-                phoneNumber:
-                  type: string
-                imageAssetId:
-                  type: string
-                  format: uuid
-                voiceAssetId:
-                  type: string
-                  format: uuid
-      responses:
-        "202":
-          description: Draft listing created and processing started
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Listing"
-
-  /internal/ml-callback/{listingId}:
-    post:
-      tags: [Ingestion]
-      summary: >
-        Called by the Python FastAPI service when ML processing for a listing
-        finishes (image enhancement, transcription, translation, description,
-        price suggestion). Spring Boot persists the results and flips the
-        listing to READY, then asks Node.js to notify the artisan.
-      security: [{ internalApiKey: [] }]
-      parameters:
-        - $ref: "#/components/parameters/ListingId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MlCallbackPayload"
-      responses:
-        "200":
-          description: Listing updated to READY
 
   # ------------------------------------------------------------------
   # ADMIN
@@ -483,6 +463,272 @@ paths:
         "200":
           description: Artisan marked as verified
 
+  # ------------------------------------------------------------------
+  # WHATSAPP
+  # ------------------------------------------------------------------
+  /whatsapp/webhook:
+    get:
+      tags: [WhatsApp]
+      summary: >
+        Webhook verification handshake required by Meta when first
+        registering the callback URL in the WhatsApp Business dashboard.
+      parameters:
+        - name: hub.mode
+          in: query
+          schema:
+            type: string
+        - name: hub.verify_token
+          in: query
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Echoes back hub.challenge if the verify token matches
+          content:
+            text/plain:
+              schema:
+                type: string
+
+    post:
+      tags: [WhatsApp]
+      summary: >
+        Receives incoming WhatsApp messages from Meta (photo + voice note
+        from an artisan). Extracts the media, downloads it from Meta's
+        temporary media URL, stores it via the same upload flow as
+        /uploads/init, then creates a draft listing internally by resolving
+        the artisan by phone number (see /internal/ingestion/whatsapp).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsAppInboundPayload"
+      responses:
+        "200":
+          description: >
+            Acknowledged. Must respond quickly (Meta expects a fast 200) -
+            do heavy work (download/store/ingest) asynchronously after
+            responding.
+
+  /whatsapp/send:
+    post:
+      tags: [WhatsApp]
+      summary: >
+        Send an outbound WhatsApp message to an artisan - typically called
+        internally after ml-service's callback marks a listing READY
+        ("Your listing is ready - reply REVIEW to see it").
+      security: [{ internalApiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsAppSendRequest"
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+
+  # ------------------------------------------------------------------
+  # NOTIFICATIONS
+  # ------------------------------------------------------------------
+  /notifications/dispatch:
+    post:
+      tags: [Notifications]
+      summary: >
+        Internal call fired whenever a user-facing event happens (listing
+        READY, order CONFIRMED/SHIPPED, etc). Decides the best channel (push
+        notification vs WhatsApp vs in-app realtime event) and fires it.
+      security: [{ internalApiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationDispatchRequest"
+      responses:
+        "202":
+          description: Notification accepted for delivery
+
+  /notifications/register-device:
+    post:
+      tags: [Notifications]
+      summary: >
+        Flutter calls this once at login/app-start to register the device's
+        FCM token so push notifications can reach it.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, fcmToken, platform]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                fcmToken:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ANDROID, IOS]
+      responses:
+        "200":
+          description: Device registered
+
+  # ------------------------------------------------------------------
+  # REALTIME (Socket.IO - documented here for reference, not pure REST)
+  # ------------------------------------------------------------------
+  /realtime/chat/{orderId}/messages:
+    get:
+      tags: [Realtime]
+      summary: >
+        Fetch chat history for a buyer-artisan conversation tied to an
+        order (if time permits building chat). Live messages during an
+        active session are pushed over a Socket.IO channel named
+        "order:{orderId}", not via this REST endpoint - this endpoint is
+        for loading history on (re)connect.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+    post:
+      tags: [Realtime]
+      summary: Send a chat message (also broadcast live over Socket.IO to the other participant)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  # ------------------------------------------------------------------
+  # ONDC (stretch goal)
+  # ------------------------------------------------------------------
+  /ondc/webhook:
+    post:
+      tags: [ONDC]
+      summary: >
+        STRETCH GOAL - receives ONDC network callbacks (e.g. on_search,
+        on_confirm) and translates them into catalog/order updates. Build
+        only after WhatsApp + core flow are solid. A mocked version that
+        just logs and acknowledges is acceptable for the demo if full ONDC
+        integration isn't feasible in the time available.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Shape follows the ONDC Beckn protocol action being received (context + message)
+              additionalProperties: true
+      responses:
+        "200":
+          description: Acknowledged (ONDC "ACK" pattern)
+
+  # ------------------------------------------------------------------
+  # INGESTION (internal)
+  # ------------------------------------------------------------------
+  /internal/ingestion/whatsapp:
+    post:
+      tags: [Ingestion]
+      summary: >
+        Invoked internally by the WhatsApp webhook handler when an artisan
+        sends a photo + voice note over WhatsApp. Creates a draft listing
+        the same way /catalog/listings does, but resolves the artisan by
+        phone number instead of a JWT. Kept as a distinct endpoint (rather
+        than inlined into the webhook handler) so the phone-number ingestion
+        path stays independently testable.
+      security: [{ internalApiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, imageAssetId, voiceAssetId]
+              properties:
+                phoneNumber:
+                  type: string
+                imageAssetId:
+                  type: string
+                  format: uuid
+                voiceAssetId:
+                  type: string
+                  format: uuid
+      responses:
+        "202":
+          description: Draft listing created and processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Listing"
+
+  /internal/ml-callback/{listingId}:
+    post:
+      tags: [Ingestion]
+      summary: >
+        Called by the Python ml-service when inference for a listing
+        finishes (image enhancement, transcription, translation, description,
+        price suggestion). Persists the results, flips the listing to READY,
+        and dispatches a notification to the artisan.
+      security: [{ internalApiKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MlCallbackPayload"
+      responses:
+        "200":
+          description: Listing updated to READY
+
 components:
   securitySchemes:
     bearerAuth:
@@ -493,7 +739,7 @@ components:
       type: apiKey
       in: header
       name: X-Internal-Api-Key
-      description: Shared secret used only by Node.js and Python services, never exposed to the client apps
+      description: Shared secret used only between this service and ml-service, never exposed to client apps
 
   parameters:
     ArtisanId:
@@ -707,5 +953,88 @@ components:
           type: string
           enum: [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
         createdAt:
+          type: string
+          format: date-time
+
+    WhatsAppInboundPayload:
+      type: object
+      description: >
+        Simplified shape - Meta's actual webhook payload is deeply nested
+        (entry[].changes[].value.messages[]). Parse down to this shape in
+        your handler before ingesting.
+      properties:
+        fromPhoneNumber:
+          type: string
+          example: "+919812345678"
+        messageType:
+          type: string
+          enum: [image, audio, text]
+        mediaId:
+          type: string
+          description: Meta's temporary media ID - must be resolved to a download URL via the Graph API before it expires
+          nullable: true
+        text:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    WhatsAppSendRequest:
+      type: object
+      required: [toPhoneNumber, templateOrText]
+      properties:
+        toPhoneNumber:
+          type: string
+        templateOrText:
+          type: string
+          example: "Your listing for {productName} is ready! Reply REVIEW to see it."
+        mediaUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional image to attach (e.g. the enhanced product photo)
+
+    NotificationDispatchRequest:
+      type: object
+      required: [userId, eventType]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          enum:
+            - LISTING_READY
+            - LISTING_FAILED
+            - ORDER_PLACED
+            - ORDER_CONFIRMED
+            - ORDER_SHIPPED
+            - ORDER_DELIVERED
+        preferredChannel:
+          type: string
+          enum: [PUSH, WHATSAPP, AUTO]
+          default: AUTO
+          description: AUTO picks push vs WhatsApp based on what the user has available/registered
+        payload:
+          type: object
+          additionalProperties: true
+          description: Event-specific data used to fill notification templates (e.g. listingId, productName, orderId)
+
+    ChatMessage:
+      type: object
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        senderId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        sentAt:
           type: string
           format: date-time

@@ -2,22 +2,22 @@ openapi: 3.0.3
 info:
   title: SIH26090 - ML Inference Service (FastAPI)
   description: >
-    Owned by the Python Developer (serving/infra) wrapping models from the
-    ML Developer. Called only by the Spring Boot orchestration layer -
-    never directly by Flutter, Node.js, or end users. Each capability is
-    its own endpoint with a clear input/output schema rather than one
-    monolithic "do everything" endpoint, so failures are isolated and
-    each piece can be tested independently.
+    Owned by the Python/ML Developer, wrapping the inference models.
+    Called only by backend-service's orchestration layer - never directly
+    by Flutter or end users. Each capability is its own endpoint with a
+    clear input/output schema rather than one monolithic "do everything"
+    endpoint, so failures are isolated and each piece can be tested
+    independently.
 
-    Typical flow after Spring Boot creates a PENDING listing:
+    Typical flow after backend-service creates a PENDING listing:
       1. POST /v1/image/enhance          (async)
       2. POST /v1/audio/transcribe       (async, can run in parallel with #1)
       3. POST /v1/text/translate         (after #2 completes)
       4. POST /v1/text/generate-description
       5. POST /v1/price/suggest
-    Spring Boot may call these sequentially or fan out in parallel where
+    backend-service may call these sequentially or fan out in parallel where
     there's no dependency, then POST the combined result back to
-    /internal/ml-callback/{listingId} on the Spring Boot API.
+    /internal/ml-callback/{listingId} on backend-service.
   version: "0.1.0"
 
 servers:
@@ -246,7 +246,7 @@ components:
         listingId:
           type: string
           format: uuid
-          description: Passed through so Spring Boot can correlate async results
+          description: Passed through so backend-service can correlate async results
 
     ImageEnhanceResult:
       type: object
