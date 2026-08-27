@@ -17,15 +17,6 @@ services:
     ports:
       - "6379:6379"
 
-  core-api:
-    build: ./core-api
-    depends_on:
-      - postgres
-    ports:
-      - "8080:8080"
-    env_file:
-      - ./core-api/.env
-
   ml-service:
     build: ./ml-service
     ports:
@@ -33,14 +24,15 @@ services:
     env_file:
       - ./ml-service/.env
 
-  realtime-service:
-    build: ./realtime-service
+  backend-service:
+    build: ./backend-service
     depends_on:
-      - core-api
+      - postgres
+      - ml-service
     ports:
       - "3000:3000"
     env_file:
-      - ./realtime-service/.env
+      - ./backend-service/.env
 
 volumes:
   postgres-data:

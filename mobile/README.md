@@ -2,8 +2,8 @@
 
 Artisan-facing app: onboarding, camera capture, voice recording, offline-first queue, catalog browse, buyer-side search.
 
-Consumes: `core-api` REST contract.
-Receives: push notifications from `realtime-service`.
+Consumes: `backend-service` REST contract.
+Receives: push notifications from `backend-service`.
 
 ## Set up
 
@@ -27,4 +27,4 @@ lib/
 └── shared/
 ```
 
-Point the API client at `core-api`'s base URL via an environment config (`--dart-define=API_BASE_URL=...`), not a hardcoded constant, so switching between local/mock/staging is a build flag, not a code change.
+Point the API client at `backend-service`'s base URL via an environment config (`--dart-define=API_BASE_URL=...`), not a hardcoded constant, so switching between local/mock/staging is a build flag, not a code change.

@@ -1,0 +1,27 @@
+name: backend-service CI
+
+on:
+  push:
+    paths:
+      - "backend-service/**"
+      - "contracts/backend-service-contract.yaml"
+  pull_request:
+    paths:
+      - "backend-service/**"
+      - "contracts/backend-service-contract.yaml"
+
+jobs:
+  backend-service-build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend-service/package-lock.json
+      - run: npm ci
+      - run: npm test

@@ -2,12 +2,6 @@
 .env
 *.env.local
 
-# Java / Spring Boot
-core-api/target/
-core-api/.mvn/wrapper/maven-wrapper.jar
-core-api/*.iml
-core-api/.idea/
-
 # Python / FastAPI
 ml-service/.venv/
 ml-service/__pycache__/
@@ -17,8 +11,8 @@ ml-service/models/
 ml-service/.pytest_cache/
 
 # Node.js
-realtime-service/node_modules/
-realtime-service/npm-debug.log*
+backend-service/node_modules/
+backend-service/npm-debug.log*
 
 # Flutter
 mobile/.dart_tool/

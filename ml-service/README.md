@@ -1,7 +1,7 @@
 # ml-service (Python / FastAPI)
 
 Owns: image enhancement, ASR transcription, translation, description generation, price suggestion.
-Stateless — called only by `core-api`. Never called directly by mobile/Node.js.
+Stateless — called only by `backend-service`. Never called directly by mobile.
 
 Contract: [`../contracts/ml-service-contract.yaml`](../contracts/ml-service-contract.yaml)
 

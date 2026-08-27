@@ -2,9 +2,8 @@
 
 ## Which service(s)
 
-- [ ] core-api
+- [ ] backend-service
 - [ ] ml-service
-- [ ] realtime-service
 - [ ] mobile
 - [ ] contracts (requires all owners' review)
 
