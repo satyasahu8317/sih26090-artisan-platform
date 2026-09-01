@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  mobileNumber   String
+  role           Role
+  status         Status          @default(PENDING)
+  otpHash        String?
+  otpExpiresAt   DateTime?
+  otpAttempts    Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  artisanProfile ArtisanProfile?
+  buyerProfile   BuyerProfile?
+
+  @@unique([mobileNumber, role])
+}
+
+model ArtisanProfile {
+  id                String @id @default(uuid())
+  userId            String @unique
+  name              String
+  craftType         String
+  state             String
+  district          String
+  preferredLanguage String
+  user              User   @relation(fields: [userId], references: [id])
+}
+
+model BuyerProfile {
+  id           String @id @default(uuid())
+  userId       String @unique
+  name         String
+  businessName String
+  businessType String
+  state        String
+  district     String
+  user         User   @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  ARTISAN
+  BUYER
+}
+
+enum Status {
+  PENDING
+  ACTIVE
+}
