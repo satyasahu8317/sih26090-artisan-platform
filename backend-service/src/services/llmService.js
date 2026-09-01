@@ -1,8 +1,14 @@
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+function getGroqClient() {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not configured");
+  }
+
+  return new Groq({
+    apiKey: process.env.GROQ_API_KEY
+  });
+}
 
 export const generateStructuredCatalogue = async (text) => {
   const systemPrompt = `You are an AI catalogue assistant designed for Indian artisans and micro-entrepreneurs.
@@ -65,6 +71,7 @@ Allowed categories are ONLY:
 Return ONLY valid JSON according to the schema.`;
 
   try {
+    const groq = getGroqClient();
     const response = await groq.chat.completions.create({
       messages: [
         {

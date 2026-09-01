@@ -1,9 +1,15 @@
 import fs from 'fs';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+function getGroqClient() {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not configured");
+  }
+
+  return new Groq({
+    apiKey: process.env.GROQ_API_KEY
+  });
+}
 
 const languageMap = {
   hindi: 'hi',
@@ -20,6 +26,7 @@ const languageMap = {
 
 export const transcribeAudioFile = async (filePath) => {
   try {
+    const groq = getGroqClient();
     const transcription = await groq.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
       model: "whisper-large-v3-turbo",
