@@ -10,8 +10,10 @@ app.get("/health", (_req, res) => {
 });
 
 
-app.use("/api/auth", authRoutes);
+import aiRoutes from "./routes/aiRoutes.js";
 
+app.use("/api/auth", authRoutes);
+app.use("/api/v1/ai", aiRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
