@@ -97,10 +97,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
 
             // ───────── FORM AREA ─────────
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
+          Expanded(
+  child: SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 36),
@@ -193,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    const Spacer(),
+               const SizedBox(height: 24),
 
                     // Data safety box
                     Container(
@@ -292,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
-            ),
+            ),),
           ],
         ),
       ),
