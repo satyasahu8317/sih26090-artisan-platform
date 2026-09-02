@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RoleSelectionScreen extends StatefulWidget {
+import '../providers/onboarding_provider.dart';
+
+class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
 
   @override
-  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+  ConsumerState<RoleSelectionScreen> createState() =>
+      _RoleSelectionScreenState();
 }
 
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  String? selectedRole;
-
+class _RoleSelectionScreenState
+    extends ConsumerState<RoleSelectionScreen> {
   static const Color backgroundColor = Color(0xFFF6F1E7);
   static const Color brown = Color(0xFF8B5E34);
   static const Color green = Color(0xFF2E7058);
@@ -17,6 +20,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+    // Riverpod se selected role ko listen kar rahe hain
+    final selectedRole = ref.watch(selectedRoleProvider);
+
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
@@ -68,40 +75,50 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // SELLER / ARTISAN
                     Expanded(
                       child: _RoleCard(
-                        imagePath: 'assets/images/auth/artist_side.png',
+                        imagePath:
+                            'assets/images/auth/artist_side.png',
                         icon: Icons.shopping_basket_outlined,
                         title: 'Seller / Artisan',
-                        description: 'Sell your handmade\nproducts',
-                        feature: 'Reach more buyers\nCreate listing with AI',
+                        description:
+                            'Sell your handmade\nproducts',
+                        feature:
+                            'Reach more buyers\nCreate listing with AI',
                         buttonText: 'Continue as Seller',
                         color: brown,
                         isSelected: selectedRole == 'seller',
+
                         onTap: () {
-                          setState(() {
-                            selectedRole = 'seller';
-                          });
+                          ref
+                              .read(selectedRoleProvider.notifier)
+                              .state = 'seller';
                         },
                       ),
                     ),
 
                     const SizedBox(width: 14),
 
+                    // BUYER
                     Expanded(
                       child: _RoleCard(
-                        imagePath: 'assets/images/auth/buyer_side.png',
+                        imagePath:
+                            'assets/images/auth/buyer_side.png',
                         icon: Icons.shopping_bag_outlined,
                         title: 'Buyer',
-                        description: 'Discover handmade\nproducts',
-                        feature: 'Explore artisans\nbuy authentic crafts',
+                        description:
+                            'Discover handmade\nproducts',
+                        feature:
+                            'Explore artisans\nbuy authentic crafts',
                         buttonText: 'Continue as Buyer',
                         color: green,
                         isSelected: selectedRole == 'buyer',
+
                         onTap: () {
-                          setState(() {
-                            selectedRole = 'buyer';
-                          });
+                          ref
+                              .read(selectedRoleProvider.notifier)
+                              .state = 'buyer';
                         },
                       ),
                     ),
@@ -119,11 +136,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   onPressed: selectedRole == null
                       ? null
                       : () {
-                          // Navigation will be added next.
+                          // Navigation baad mein add karenge.
+                          debugPrint(
+                            'Selected role: $selectedRole',
+                          );
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brown,
-                    disabledBackgroundColor: brown.withOpacity(0.45),
+                    disabledBackgroundColor:
+                        brown.withValues(alpha: .45),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -205,7 +226,9 @@ class _RoleCard extends StatelessWidget {
             // Card content
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                ),
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
@@ -256,7 +279,9 @@ class _RoleCard extends StatelessWidget {
                     Container(
                       width: double.infinity,
                       height: 45,
-                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
@@ -306,11 +331,13 @@ class _RoleCard extends StatelessWidget {
                           elevation: 0,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius:
+                                BorderRadius.circular(8),
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
                           children: [
                             Text(
                               buttonText,

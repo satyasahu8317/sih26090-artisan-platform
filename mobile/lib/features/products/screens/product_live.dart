@@ -105,7 +105,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       'मेरी सूची',
                       style: TextStyle(
                         fontSize: 13,
-                        color: brown.withOpacity(0.65),
+                        color: brown.withValues(alpha: .65),
                       ),
                     ),
                   ],
@@ -272,7 +272,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: Icon(
                 _getProductIcon(product['name']),
                 size: 34,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: .8),
               ),
             ),
           ),
@@ -341,28 +341,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         Icon(
                           Icons.visibility_outlined,
                           size: 11,
-                          color: darkBrown.withOpacity(0.65),
+                          color: darkBrown.withValues(alpha:0.65),
                         ),
                         const SizedBox(width: 3),
                         Text(
                           product['views'],
                           style: TextStyle(
                             fontSize: 8.5,
-                            color: darkBrown.withOpacity(0.65),
+                            color: darkBrown.withValues(alpha: .65),
                           ),
                         ),
                         const SizedBox(width: 10),
                         Icon(
                           Icons.chat_bubble_outline,
                           size: 10,
-                          color: darkBrown.withOpacity(0.65),
+                          color: darkBrown.withValues(alpha: .65),
                         ),
                         const SizedBox(width: 3),
                         Text(
                           product['enquiries'],
                           style: TextStyle(
                             fontSize: 8.5,
-                            color: darkBrown.withOpacity(0.65),
+                            color: darkBrown.withValues(alpha: .65),
                           ),
                         ),
                       ],
@@ -378,7 +378,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             child: Icon(
               Icons.chevron_right,
               size: 19,
-              color: brown.withOpacity(0.7),
+              color: brown.withValues(alpha: .7),
             ),
           ),
         ],

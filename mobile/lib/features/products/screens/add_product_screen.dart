@@ -51,7 +51,7 @@ class AddProductScreen extends StatelessWidget {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: brownColor.withOpacity(0.35),
+                              color: brownColor.withValues(alpha: .35),
                             ),
                           ),
 
@@ -130,7 +130,7 @@ onTap: () async {
                             height: 66,
 
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha:0.18),
                               shape: BoxShape.circle,
                             ),
 

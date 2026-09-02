@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key});
@@ -101,9 +102,9 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                     child: IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                    onPressed: () {
+  context.go('/login');
+},
                       icon: const Icon(
                         Icons.arrow_back,
                         color: darkBrown,
@@ -153,7 +154,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
+                          color:Colors.black.withValues(alpha: 0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -182,7 +183,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha:0.08),
                             blurRadius: 3,
                           ),
                         ],
@@ -343,7 +344,37 @@ class _OtpScreenState extends State<OtpScreen> {
                   },
                 ),
               ),
+// ---------------- VERIFY OTP ----------------
+const SizedBox(height: 24),
 
+SizedBox(
+  width: double.infinity,
+  height: 56,
+  child: ElevatedButton(
+    onPressed: _otp.length == 4
+        ? () {
+            context.go('/language');
+          }
+        : null,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF8B5E34),
+      disabledBackgroundColor:
+          const Color(0xFF8B5E34).withValues(alpha:0.4),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+    child: const Text(
+      'Verify OTP →',
+      style: TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  ),
+),
               const SizedBox(height: 20),
 
               // ---------------- DOTS ----------------

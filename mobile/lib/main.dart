@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
-import 'features/onboarding/screens/language_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sih26090_mobile/core/routes/app_routes.dart';
+
+
 
 void main() {
-  runApp(const KalaMitrApp());
+  runApp(
+    const ProviderScope(
+      child: KalaMitrApp(),
+    ),
+  );
 }
 
 class KalaMitrApp extends StatelessWidget {
@@ -10,10 +17,10 @@ class KalaMitrApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'KalaMitr',
-      home: const LanguageScreen(),
+      routerConfig: appRouter,
     );
   }
 }

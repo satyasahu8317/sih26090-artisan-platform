@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:go_router/go_router.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -242,9 +242,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 66,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // OTP navigation yahan baad mein add karenge.
-                        },
+                      onPressed: () {
+  context.go('/otp');
+},
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF996735),
                           foregroundColor: Colors.white,

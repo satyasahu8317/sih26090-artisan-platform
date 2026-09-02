@@ -57,7 +57,7 @@ class ProductDetailScreen extends StatelessWidget {
                               ? Image.network(
                                   imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) {
+                                  errorBuilder: (_, _, _) {
                                     return Container(
                                       color: const Color(0xFFD07B4D),
                                       child: const Icon(
@@ -436,7 +436,7 @@ class ProductDetailScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white.withValues(alpha: .9),
       shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,

@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: .06),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -686,7 +686,7 @@ class _HomeScreenState extends State<HomeScreen> {
             top: -11,
             child: GestureDetector(
               onTap: () {
-                // TODO: Open Add Product
+               
               },
               child: Container(
                 width: 60,
@@ -696,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: .15),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),

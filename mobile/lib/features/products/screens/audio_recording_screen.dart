@@ -373,7 +373,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF8B5E34)
-                                .withOpacity(0.18),
+                                .withValues(alpha: .18),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
