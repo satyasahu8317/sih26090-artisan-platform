@@ -119,14 +119,27 @@ export const getArtisanOrders = async (req, res, next) => {
       throw new Error('Artisan profile not found');
     }
 
+    const { status } = req.query;
+    const where = { artisanId: artisanProfile.id };
+    if (status) {
+      where.status = status;
+    }
+
     const orders = await prisma.order.findMany({
-      where: { artisanId: artisanProfile.id },
+      where,
       include: {
         buyer: {
           select: {
             name: true,
             businessName: true,
             businessType: true
+          }
+        },
+        product: {
+          select: {
+            id: true,
+            productName: true,
+            imageUrl: true
           }
         }
       },

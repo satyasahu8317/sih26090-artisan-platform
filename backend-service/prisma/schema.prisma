@@ -19,9 +19,10 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  artisanProfile ArtisanProfile?
-  buyerProfile   BuyerProfile?
-  notifications  Notification[]
+  artisanProfile  ArtisanProfile?
+  buyerProfile    BuyerProfile?
+  notifications   Notification[]
+  enquiryMessages EnquiryMessage[]
 
   @@unique([mobileNumber, role])
 }
@@ -70,6 +71,7 @@ model Product {
   updatedAt   DateTime       @updatedAt
 
   enquiries Enquiry[]
+  orders    Order[]
 
   @@index([artisanId])
   @@index([status])
@@ -90,15 +92,21 @@ model Notification {
 }
 
 model Order {
-  id          String         @id @default(uuid())
-  buyerId     String
-  buyer       BuyerProfile   @relation(fields: [buyerId], references: [id])
-  artisanId   String
-  artisan     ArtisanProfile @relation(fields: [artisanId], references: [id])
-  status      OrderStatus    @default(PENDING)
-  totalAmount Float?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id           String         @id @default(uuid())
+  buyerId      String
+  buyer        BuyerProfile   @relation(fields: [buyerId], references: [id])
+  artisanId    String
+  artisan      ArtisanProfile @relation(fields: [artisanId], references: [id])
+  productId    String?
+  product      Product?       @relation(fields: [productId], references: [id])
+  requestedQty Int
+  acceptedQty  Int?
+  unitPrice    Float?
+  requiredBy   DateTime?
+  status       OrderStatus    @default(PENDING)
+  totalAmount  Float?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([artisanId, status])
   @@index([buyerId, status])
@@ -117,8 +125,22 @@ model Enquiry {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
+  messages EnquiryMessage[]
+
   @@index([artisanId, status])
   @@index([buyerId, status])
+}
+
+model EnquiryMessage {
+  id        String   @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry  @relation(fields: [enquiryId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
 }
 
 enum Role {
@@ -150,7 +172,9 @@ enum NotificationType {
 enum OrderStatus {
   PENDING
   ACCEPTED
+  PARTIALLY_ACCEPTED
   REJECTED
+  FULFILLING
   COMPLETED
   CANCELLED
 }
