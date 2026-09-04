@@ -202,4 +202,117 @@ describe("Product API", () => {
     assert.ok(body.data.length >= 3);
     assert.equal(body.data[0].artisanId, artisanProfileId);
   });
+
+  let createdProductId;
+
+  test("Setup: get a product ID to use for the next tests", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/my`, {
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    const body = await res.json();
+    createdProductId = body.data[0].id;
+  });
+
+  test("8. Artisan can GET own product", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.id, createdProductId);
+  });
+
+  test("9. Artisan cannot GET another artisan's product", async () => {
+    // We don't have a second artisan, but we can try as BUYER (returns 403)
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      headers: { "Authorization": `Bearer ${buyerToken}` }
+    });
+    await res.text();
+    assert.equal(res.status, 403);
+  });
+
+  test("10. Artisan can update own product", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${artisanToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        category: "Updated Category"
+      })
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.category, "Updated Category");
+  });
+
+  test("11. Artisan cannot update another artisan's product / Non-artisan cannot update", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${buyerToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        category: "Stolen Category"
+      })
+    });
+    await res.text();
+    assert.equal(res.status, 403);
+  });
+
+  test("12. status cannot be changed through PUT", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${artisanToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "PUBLISHED" // Should be ignored
+      })
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    // Since Zod ignores it, status should remain DRAFT
+    assert.equal(body.data.status, "DRAFT");
+  });
+
+  test("13. Artisan can publish own product", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}/publish`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.status, "PUBLISHED");
+  });
+
+  test("14. Artisan can unpublish own product", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}/unpublish`, {
+      method: "PATCH",
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.status, "DRAFT");
+  });
+
+  test("15. Artisan can delete own product", async () => {
+    const res = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.message, "Product deleted successfully");
+
+    // Verify it's gone
+    const getRes = await fetch(`http://localhost:${port}/api/v1/products/${createdProductId}`, {
+      headers: { "Authorization": `Bearer ${artisanToken}` }
+    });
+    await getRes.text();
+    assert.equal(getRes.status, 404);
+  });
 });
