@@ -42,7 +42,9 @@ jobs:
       - run: npx prisma db push
         env:
           DATABASE_URL: "postgresql://testuser:testpassword@localhost:5432/testdb?schema=public"
+          DIRECT_DATABASE_URL: "postgresql://testuser:testpassword@localhost:5432/testdb?schema=public"
       - run: npm test
         env:
           DATABASE_URL: "postgresql://testuser:testpassword@localhost:5432/testdb?schema=public"
+          DIRECT_DATABASE_URL: "postgresql://testuser:testpassword@localhost:5432/testdb?schema=public"
           JWT_SECRET: "ci_jwt_secret"
