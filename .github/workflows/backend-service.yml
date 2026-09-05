@@ -2,15 +2,11 @@ name: backend-service CI
 
 on:
   push:
-    paths:
-      - "backend-service/**"
-      - "contracts/**"
-      - ".github/workflows/backend-service.yml"
+    branches:
+      - feat/yash-ai-catalogue
   pull_request:
-    paths:
-      - "backend-service/**"
-      - "contracts/**"
-      - ".github/workflows/backend-service.yml"
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
@@ -19,6 +15,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb?schema=public
+      JWT_SECRET: ci_test_secret
     defaults:
       run:
         working-directory: backend-service
@@ -38,14 +35,24 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: backend-service/package-lock.json
-      - run: npm ci
-      - run: npx prisma db push
-      - run: npm test
-        env:
-          JWT_SECRET: "ci_jwt_secret"
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Generate Prisma client
+        run: npx prisma generate
+        
+      - name: Push Prisma schema
+        run: npx prisma db push
+        
+      - name: Run test suite
+        run: npm test
