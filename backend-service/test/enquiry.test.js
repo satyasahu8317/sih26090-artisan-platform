@@ -142,10 +142,10 @@ describe("Enquiry API", () => {
       where: { artisanId: artisanProfileId }
     });
     await prisma.artisanProfile.deleteMany({
-      where: { id: artisanProfileId }
+      where: { userId: artisanUserId }
     });
     await prisma.buyerProfile.deleteMany({
-      where: { id: { in: [buyerProfileId] } }
+      where: { userId: { in: [buyerUserId, unrelatedBuyerUserId] } }
     });
     await prisma.user.deleteMany({
       where: { id: { in: [artisanUserId, buyerUserId, unrelatedBuyerUserId] } }
