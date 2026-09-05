@@ -18,6 +18,14 @@ describe("Order API", () => {
     server = app.listen(0);
     port = server.address().port;
 
+    const testPhones = ['+9990001111', '+9990002222', '+9990003333', '+9990004444'];
+    await prisma.notification.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.order.deleteMany({ where: { buyer: { user: { mobileNumber: { in: testPhones } } } } });
+    await prisma.product.deleteMany({ where: { artisan: { user: { mobileNumber: { in: testPhones } } } } });
+    await prisma.artisanProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.buyerProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.user.deleteMany({ where: { mobileNumber: { in: testPhones } } });
+
     // Create 2 artisans and 2 buyers
     const artisanUser = await prisma.user.create({ data: { mobileNumber: '+9990001111', role: 'ARTISAN', status: 'ACTIVE' } });
     artisanUserId = artisanUser.id;

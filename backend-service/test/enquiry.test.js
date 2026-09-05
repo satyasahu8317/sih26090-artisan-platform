@@ -28,7 +28,7 @@ describe("Enquiry API", () => {
 
     // Clean up previous
     await prisma.notification.deleteMany({
-      where: { user: { mobileNumber: TEST_PHONE_ARTISAN } }
+      where: { user: { mobileNumber: { in: [TEST_PHONE_ARTISAN, TEST_PHONE_BUYER, TEST_PHONE_UNRELATED_BUYER] } } }
     });
     await prisma.enquiryMessage.deleteMany({
       where: { enquiry: { artisan: { user: { mobileNumber: TEST_PHONE_ARTISAN } } } }
