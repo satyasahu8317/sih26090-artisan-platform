@@ -4,11 +4,14 @@ on:
   push:
     paths:
       - "backend-service/**"
-      - "contracts/backend-service-contract.yaml"
+      - "contracts/**"
+      - ".github/workflows/backend-service.yml"
   pull_request:
     paths:
       - "backend-service/**"
-      - "contracts/backend-service-contract.yaml"
+      - "contracts/**"
+      - ".github/workflows/backend-service.yml"
+  workflow_dispatch:
 
 jobs:
   backend-service-build-and-test:
