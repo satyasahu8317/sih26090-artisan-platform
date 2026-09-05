@@ -3,22 +3,26 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model User {
-  id             String          @id @default(uuid())
-  mobileNumber   String
-  role           Role
-  status         Status          @default(PENDING)
-  otpHash        String?
-  otpExpiresAt   DateTime?
-  otpAttempts    Int             @default(0)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  artisanProfile ArtisanProfile?
-  buyerProfile   BuyerProfile?
+  id           String    @id @default(uuid())
+  mobileNumber String
+  role         Role
+  status       Status    @default(PENDING)
+  otpHash      String?
+  otpExpiresAt DateTime?
+  otpAttempts  Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  artisanProfile  ArtisanProfile?
+  buyerProfile    BuyerProfile?
+  notifications   Notification[]
+  enquiryMessages EnquiryMessage[]
 
   @@unique([mobileNumber, role])
 }
@@ -27,11 +31,15 @@ model ArtisanProfile {
   id                String @id @default(uuid())
   userId            String @unique
   name              String
-  craftType         String
+  craftType         String // Kept as String to match existing DB
   state             String
   district          String
   preferredLanguage String
   user              User   @relation(fields: [userId], references: [id])
+
+  products  Product[]
+  orders    Order[]
+  enquiries Enquiry[]
 }
 
 model BuyerProfile {
@@ -39,10 +47,100 @@ model BuyerProfile {
   userId       String @unique
   name         String
   businessName String
-  businessType String
+  businessType String // Kept as String to match existing DB
   state        String
   district     String
   user         User   @relation(fields: [userId], references: [id])
+
+  orders    Order[]
+  enquiries Enquiry[]
+}
+
+model Product {
+  id          String         @id @default(uuid())
+  artisanId   String
+  artisan     ArtisanProfile @relation(fields: [artisanId], references: [id])
+  productName Json
+  category    String
+  material    String?
+  description Json
+  tags        String[]
+  imageUrl    String?
+  status      ProductStatus  @default(DRAFT)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  enquiries Enquiry[]
+  orders    Order[]
+
+  @@index([artisanId])
+  @@index([status])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId, isRead])
+}
+
+model Order {
+  id           String         @id @default(uuid())
+  buyerId      String
+  buyer        BuyerProfile   @relation(fields: [buyerId], references: [id])
+  artisanId    String
+  artisan      ArtisanProfile @relation(fields: [artisanId], references: [id])
+  productId    String?
+  product      Product?       @relation(fields: [productId], references: [id])
+  requestedQty Int
+  acceptedQty  Int?
+  unitPrice    Float?
+  requiredBy   DateTime?
+  status       OrderStatus    @default(PENDING)
+  totalAmount  Float?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([artisanId, status])
+  @@index([buyerId, status])
+}
+
+model Enquiry {
+  id        String         @id @default(uuid())
+  buyerId   String
+  buyer     BuyerProfile   @relation(fields: [buyerId], references: [id])
+  artisanId String
+  artisan   ArtisanProfile @relation(fields: [artisanId], references: [id])
+  productId String?
+  product   Product?       @relation(fields: [productId], references: [id])
+  message   String
+  status    EnquiryStatus  @default(NEW)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  messages EnquiryMessage[]
+
+  @@index([artisanId, status])
+  @@index([buyerId, status])
+}
+
+model EnquiryMessage {
+  id        String   @id @default(uuid())
+  enquiryId String
+  enquiry   Enquiry  @relation(fields: [enquiryId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([enquiryId, createdAt])
 }
 
 enum Role {
@@ -53,4 +151,37 @@ enum Role {
 enum Status {
   PENDING
   ACTIVE
+}
+
+// These are no longer used for craftType/businessType but keeping them in schema won't hurt, 
+// or I can remove them entirely since they are not used. 
+// I will remove CraftType and BusinessType enums since the columns are just String now.
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum NotificationType {
+  INFO
+  ORDER
+  ENQUIRY
+  SYSTEM
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  REJECTED
+  FULFILLING
+  COMPLETED
+  CANCELLED
+}
+
+enum EnquiryStatus {
+  NEW
+  READ
+  RESPONDED
+  CLOSED
 }
