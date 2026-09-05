@@ -79,7 +79,7 @@ export const createOrder = async (req, res, next) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400);
-      return next(new Error(error.errors[0].message));
+      return next(new Error(error.issues[0]?.message || "Validation failed"));
     }
     next(error);
   }
@@ -239,7 +239,7 @@ export const partialAcceptOrder = async (req, res, next) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400);
-      return next(new Error(error.errors[0].message));
+      return next(new Error(error.issues[0]?.message || "Validation failed"));
     }
     next(error);
   }
