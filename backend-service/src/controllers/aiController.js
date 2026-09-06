@@ -144,6 +144,76 @@ export const testMlAudio = async (req, res, next) => {
   }
 };
 
+import { firebaseStorageService } from '../services/firebaseStorage.js';
+
+export const uploadMediaImage = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (user.role !== 'ARTISAN') {
+      res.status(403);
+      throw new Error('Only artisans can upload media');
+    }
+
+    const artisanProfile = await prisma.artisanProfile.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!artisanProfile) {
+      res.status(404);
+      throw new Error('Artisan profile not found');
+    }
+
+    const { url, path } = await firebaseStorageService.uploadCatalogueMedia(
+      req.file.buffer,
+      artisanProfile.id,
+      'image',
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { url, path, contentType: req.file.mimetype }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadMediaAudio = async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (user.role !== 'ARTISAN') {
+      res.status(403);
+      throw new Error('Only artisans can upload media');
+    }
+
+    const artisanProfile = await prisma.artisanProfile.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!artisanProfile) {
+      res.status(404);
+      throw new Error('Artisan profile not found');
+    }
+
+    const { url, path } = await firebaseStorageService.uploadCatalogueMedia(
+      req.file.buffer,
+      artisanProfile.id,
+      'audio',
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { url, path, contentType: req.file.mimetype }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const generateFullCatalogue = async (req, res, next) => {
   try {
     const user = req.user;
@@ -176,6 +246,11 @@ export const generateFullCatalogue = async (req, res, next) => {
     if (!productName || !category) {
       res.status(400);
       throw new Error('Missing required fields: productName and category');
+    }
+
+    if (!imageUrl && !audioUrl) {
+      res.status(400);
+      throw new Error('At least one of imageUrl or audioUrl must be provided');
     }
 
     // 1. Generate listingId early for correlation and persistence

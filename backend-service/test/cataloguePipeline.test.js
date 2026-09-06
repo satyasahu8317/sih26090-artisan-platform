@@ -31,6 +31,14 @@ describe('Catalogue Pipeline API', () => {
   let buyerToken = null;
 
   beforeEach(async () => {
+    const existingProfile = await prisma.artisanProfile.findUnique({ where: { userId: 'user-artisan' } });
+    if (existingProfile) {
+      await prisma.product.deleteMany({ where: { artisanId: existingProfile.id } });
+    }
+    await prisma.artisanProfile.deleteMany({ where: { userId: 'user-artisan' } });
+    await prisma.user.deleteMany({ where: { id: 'user-artisan' } });
+    await prisma.user.deleteMany({ where: { id: 'user-buyer' } });
+
     // Setup test DB data
     const user = await prisma.user.create({
       data: {
@@ -214,5 +222,39 @@ describe('Catalogue Pipeline API', () => {
     // Assert DB is empty for this artisan
     const products = await prisma.product.findMany({ where: { artisanId: artisanProfile.id } });
     assert.strictEqual(products.length, 0);
+  });
+
+  it('5. should return 400 if neither image nor audio is provided', async () => {
+    const payload = {
+      productName: { en: 'test', hi: 'test' },
+      category: 'Wood Craft'
+    };
+
+    const res = await request(app)
+      .post('/api/v1/ai/catalogue/ml-generate')
+      .set('Authorization', `Bearer ${artisanToken}`)
+      .send(payload);
+    
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body.message, /At least one of imageUrl or audioUrl must be provided/);
+  });
+
+  it('6. should handle only image safely', async () => {
+    const payload = {
+      productName: { en: 'test', hi: 'test' },
+      category: 'Wood Craft',
+      imageUrl: 'https://raw.com/img.jpg'
+    };
+
+    const res = await request(app)
+      .post('/api/v1/ai/catalogue/ml-generate')
+      .set('Authorization', `Bearer ${artisanToken}`)
+      .send(payload);
+    
+    assert.strictEqual(res.statusCode, 201);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.data.description.en, 'No description provided.');
+    
+    createdProductId = res.body.data.id;
   });
 });
