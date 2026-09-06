@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { generateCatalogue, transcribeAudio, generateCatalogueFromAudio, getMlHealth, testMlImage, testMlAudio } from '../controllers/aiController.js';
+import { generateCatalogue, transcribeAudio, generateCatalogueFromAudio, getMlHealth, testMlImage, testMlAudio, generateFullCatalogue } from '../controllers/aiController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -43,5 +43,8 @@ router.post('/catalogue/generate-from-audio', protect, uploadMiddleware, generat
 router.get('/ml-health', getMlHealth);
 router.post('/ml-image-test', testMlImage);
 router.post('/ml-audio-test', testMlAudio);
+
+// New ML Orchestration endpoint
+router.post('/catalogue/ml-generate', protect, generateFullCatalogue);
 
 export default router;

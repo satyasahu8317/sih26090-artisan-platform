@@ -154,3 +154,68 @@ export const pollJobStatus = async (statusFn, jobId, maxAttempts = 30, intervalM
   err.status = 504; // Gateway Timeout
   throw err;
 };
+
+export const translateText = async (text, sourceLanguage, targetLanguages = ['en', 'hi']) => {
+  try {
+    const { url } = getMlConfig();
+    const response = await fetch(`${url}/text/translate`, {
+      method: 'POST',
+      headers: defaultHeaders(),
+      body: JSON.stringify({ text, sourceLanguage, targetLanguages }),
+      signal: AbortSignal.timeout(10000)
+    });
+    return await handleFetchError(response);
+  } catch (error) {
+    const err = new Error(`Translation request failed: ${error.message}`);
+    err.status = 502;
+    if (error.details) err.details = error.details;
+    throw err;
+  }
+};
+
+export const generateDescription = async (translatedTextEn, category, keywords = null) => {
+  try {
+    const { url } = getMlConfig();
+    const payload = { translatedTextEn, category };
+    if (keywords) payload.keywords = keywords;
+
+    const response = await fetch(`${url}/text/generate-description`, {
+      method: 'POST',
+      headers: defaultHeaders(),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000)
+    });
+    return await handleFetchError(response);
+  } catch (error) {
+    const err = new Error(`Description generation failed: ${error.message}`);
+    err.status = 502;
+    if (error.details) err.details = error.details;
+    throw err;
+  }
+};
+
+export const suggestPrice = async (listingId, category, enhancedImageUrl = null, descriptionEn = null, materialCost = null, region = null) => {
+  try {
+    const { url } = getMlConfig();
+    const payload = { category };
+    if (listingId) payload.listingId = listingId;
+    if (enhancedImageUrl) payload.enhancedImageUrl = enhancedImageUrl;
+    if (descriptionEn) payload.descriptionEn = descriptionEn;
+    if (materialCost) payload.materialCost = materialCost;
+    if (region) payload.region = region;
+
+    const response = await fetch(`${url}/price/suggest`, {
+      method: 'POST',
+      headers: defaultHeaders(),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000)
+    });
+    return await handleFetchError(response);
+  } catch (error) {
+    const err = new Error(`Price suggestion failed: ${error.message}`);
+    err.status = 502;
+    if (error.details) err.details = error.details;
+    throw err;
+  }
+};
+
