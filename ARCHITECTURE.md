@@ -128,9 +128,13 @@ Two paths create the exact same `Listing` record — the app path resolves the a
 
 ---
 
-## 5. B2B & government e-marketplace connection (ONDC)
+## 5. B2B & government e-marketplace connection (ONDC + GeM)
 
 The official problem statement names this explicitly in its *Expected Solution*, not just as an impact goal — it is not optional scope. This section supersedes the earlier "known gap" framing: it's a planned integration, sequenced early, not a last-in-line stretch goal.
+
+**Resolved: ONDC and GeM answer two different halves of the PS's phrase, not one feature satisfying both.** The PS says *"connect directly with larger B2B buyers **or** government e-marketplaces"* — two distinct buyer populations. GeM's buyer base is restricted to central government ministries, departments, and CPSEs (Central Public Sector Enterprises) procuring for their own institutional needs — it is not a private B2B or consumer marketplace, and ordinary companies cannot buy through it the way they would on Amazon/IndiaMART/ONDC. So:
+- **ONDC (below)** is the answer to "B2B buyers" (and consumers generally).
+- **GeM** is the literal, separate answer to "government e-marketplace" — it needs its own treatment, not a footnote.
 
 **What we are building — a structurally honest ONDC (Beckn protocol) seller-side connector:**
 
@@ -154,9 +158,31 @@ sequenceDiagram
 **What "structurally honest" means here:**
 - `/ondc/webhook` is a real, working endpoint that correctly parses Beckn `search` actions and responds with a correctly-shaped `on_search` payload built from our real catalog data — not a hardcoded fixture.
 - The `select → init → confirm` order flow reuses the exact same `Order` entity and status machine as app/WhatsApp orders — ONDC is a third ingestion channel into one order pipeline, not a parallel system.
-- **What this deliberately does not claim:** real ONDC network membership, which requires gateway registration and cryptographic request signing we do not have credentials for. The demo and pitch must say explicitly *"here's where a certified connection plugs in"* — never *"we're live on ONDC"*. A mock presented as the real thing is a credibility risk with judges who know the protocol; a mock presented honestly as a structurally-correct integration seam is still a strong, differentiated answer to the PS's explicit ask.
 
-**Government e-Marketplace (GeM) — separate decision, not yet made.** GeM may be the more literal reading of the PS's "government e-marketplace" phrase (as opposed to ONDC, which is a general digital-commerce network the government sponsors). GeM has its own seller-onboarding process outside Beckn. Team decision needed: either (a) treat ONDC as satisfying this requirement and say so explicitly in the pitch, or (b) scope a second thin connector. Track this decision in `ROADMAP.md` §0.
+**Real network registration is genuinely achievable, not a hard wall — corrected from an earlier, overly pessimistic assumption in this doc.** Verified against ONDC's own developer documentation: registration is **self-service** via the ONDC Participant Portal (a technology service provider/TSP is helpful, not mandatory), ONDC publishes **official Node.js signing utilities** (Ed25519 request signing, matching our stack), and there is a real **pre-production environment** for testing without claiming production network membership (note: the old "staging" terminology is deprecated — "pre-production" is the current correct term). Realistic engineering-estimate timelines: ~2–6 weeks for a working pre-production connection, ~4–8 weeks for a reliable one, ~6–12+ weeks for full production certification — treat these as directional, not an official SLA.
+
+- **Phase A (already planned above): the mocked-but-structurally-correct seam** — proves the integration shape using simulated requests, no registration needed. This stays the Checkpoint B2 bar for the demo.
+- **Phase C (new, real, scheduled — not just "an option someone could look into"): attempt actual pre-production registration.** This is genuine multi-week work for whoever owns `backend-service`, sequenced *after* Phase A and not blocking any other checkpoint. Build it behind a provider-neutral interface so the mock and the real thing are swappable:
+  ```text
+  OndcProvider
+    - registerParticipant()
+    - signRequest()
+    - verifyRequest()
+    - search() / select() / init() / confirm()
+    - syncStatus()
+  ```
+  with `DirectOndcProvider` (self-built, using ONDC's official signing utilities) as the target implementation, leaving room for a `TspOndcProvider` later if the team decides a technology service provider is worth the added cost/dependency for production.
+- **What the demo and pitch must say, at every stage short of full production certification:** *"Srijan is built as an ONDC-compatible Seller App — we've implemented the seller-side protocol adapter, signing, and catalogue/order mapping; our demonstration runs against ONDC's pre-production environment; full production participation requires completing ONDC's compliance testing and operational approval."* Never *"we're live on ONDC"* before that's actually true. A mock presented as the real thing is a credibility risk with judges who know the protocol; this phrasing is honest at every phase and still a strong, differentiated answer to the PS's explicit ask.
+
+**Government e-Marketplace (GeM) — resolved plan: catalogue export, not a live integration.**
+
+No confirmed public seller/catalogue API exists for GeM (its site references an "Integration Toolkit," but there's no evidence of an open, self-service API a third party can just start calling). Seller onboarding itself is plausible for an individual artisan directly (a proprietor/artisan-weaver route exists, an aggregator is not universally mandatory) — but real requirements (PAN, bank details, GSTIN, Udyam registration, category-specific certificates) vary by seller situation and aren't fully confirmed public information; anything specific stated to artisans or judges should be verified against GeM's own current seller documentation (gem.gov.in), not assumed from this summary.
+
+Given that, the honest, buildable plan mirrors ONDC's "structurally correct, not network-claimed" principle, one step more conservative:
+
+- **Phase 1 (buildable now, no external dependency):** a **GeM-ready catalogue export** — a function that maps an existing `Product` record (title, category, description, images, price — fields that already exist) into the data package GeM's seller portal expects (adding GST/tax, HSN, origin, packaging/delivery fields where applicable), for the artisan or a facilitator to upload manually through the official GeM portal. This is genuinely useful (removes the "I don't know how to format this for GeM" barrier) without claiming automation that doesn't exist.
+- **Phase 2 (blocked on an external, unpredictable dependency — same risk category as the Meta WhatsApp sandbox approval):** only after GeM grants official API documentation/credentials, build a real `GeMConnector` (`submitCatalogue`, `getCatalogueStatus`, `syncOrders`) — not before.
+- **What this must never claim in a demo or pitch:** "any artisan can automatically become a GeM seller through Srijan," or live GeM order sync. The correct framing is *"Srijan prepares a GeM-compliant catalogue and guides the artisan through the official onboarding process"* — same honesty bar as the ONDC seam above.
 
 **Amazon Karigar / Flipkart Samarth** are separate, non-ONDC seller-onboarding programs. At most this platform could pre-fill an artisan's product data for manual submission to those programs — it cannot auto-create seller accounts on them. Don't conflate these with ONDC in the pitch.
 

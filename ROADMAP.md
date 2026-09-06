@@ -12,7 +12,7 @@ This roadmap operationalizes the charter (`Srijan.pdf`) and the two OpenAPI cont
 
 Cross-checked against the official MoSJE problem statement text (not just the internal charter). The charter and contracts already match it closely — mandatory features, impact goals, and the cross-platform + scalable-backend framing all line up. Two things the official text calls out get dedicated treatment rather than living as footnotes:
 
-1. **"Connect directly with larger B2B buyers or government e-marketplaces" is in the official *Expected Solution* section, not just an impact goal.** This is no longer a deprioritized stretch item — it has a concrete design in `ARCHITECTURE.md` §5 (a structurally honest ONDC/Beckn connector reusing the existing `Order` pipeline) and its own phase below (Phase 2b). **Still-open team decision:** whether ONDC alone satisfies "government e-marketplace," or whether GeM needs a separate thin connector — see `ARCHITECTURE.md` §5. Flag this at the next standup rather than deciding unilaterally.
+1. **"Connect directly with larger B2B buyers or government e-marketplaces" is in the official *Expected Solution* section, not just an impact goal.** This is no longer a deprioritized stretch item — it has a concrete design in `ARCHITECTURE.md` §5 and its own phase below (Phase 2b). **Resolved:** the phrase names two separate buyer populations, not one feature — ONDC (a structurally honest Beckn connector reusing the existing `Order` pipeline) answers "B2B buyers"; GeM (government ministries/CPSEs only, a distinct and much narrower buyer base) gets its own Phase 1 deliverable — a GeM-ready catalogue export for manual portal upload, with real API integration deferred until GeM grants official access. See `ARCHITECTURE.md` §5 for the full reasoning and honesty framing for both.
 2. **UI/UX language from the official PS is more specific than our internal brief captured:** *"a highly responsive, minimalist UI/UX design (incorporating modern, clean visual hierarchies and accessible layouts)."* This is a slightly different bar than just "usable for low-literacy users" — it also signals judges will score visual polish and modern design language, not only accessibility. Feed this quote directly to the UI/UX designer (see Phase 0).
 3. **"Increasing the average annual income of the target demographic" is an impact goal the platform currently has no way to demonstrate.** `ARCHITECTURE.md` §6 specifies a cheap, concrete artisan-facing impact summary (listings published, revenue through the platform, price uplift vs. artisan-reported baseline) built from data the platform already captures. This is now a scheduled deliverable (Phase 3), not an afterthought for the pitch deck.
 
@@ -42,8 +42,10 @@ Phase 1   Parallel build (each service standalone, mocked neighbors)
               │  ⚑ Checkpoint A: every service runs standalone, correctly-shaped responses
 Phase 2   Real integration — mocks swapped for live calls
               │  ⚑ Checkpoint B: photo+voice → real reviewable listing
-Phase 2b  B2B / government e-marketplace connector (ONDC)
-              │  ⚑ Checkpoint B2: a real ONDC search hits our catalog and gets a correct on_search response
+Phase 2b  B2B / government e-marketplace connector (ONDC + GeM export)
+              │  ⚑ Checkpoint B2: real ONDC search → correct on_search response; a real GeM catalogue export
+Phase 2c  Real ONDC pre-production registration (genuine, scheduled, non-blocking)
+              │  ⚑ Checkpoint B2c: real search->on_search->select->init->confirm against ONDC pre-production
 Phase 3   Differentiators — WhatsApp E2E, offline polish, impact dashboard, pricing tuning
               │  ⚑ Checkpoint C: WhatsApp demo works unattended; impact summary shows real numbers
 Phase 4   Hardening, deploy, pitch rehearsal
@@ -133,20 +135,43 @@ This is where mocks get torn out. Sequence matters — build the chain in this o
 
 ---
 
-### Phase 2b — B2B / Government e-Marketplace Connector (ONDC)
+### Phase 2b — B2B / Government e-Marketplace Connector (ONDC + GeM)
 
-Promoted out of the stretch-goal queue per §0 — this satisfies a named *Expected Solution* line item, not just an impact goal, so it's sequenced alongside core integration rather than after every other feature.
+Promoted out of the stretch-goal queue per §0 — this satisfies a named *Expected Solution* line item, not just an impact goal, so it's sequenced alongside core integration rather than after every other feature. Per the resolved plan in `ARCHITECTURE.md` §5, this is now two separate, differently-scoped deliverables, not one.
 
-**backend-service (Node.js dev)**
+**backend-service (Node.js dev) — ONDC (the "B2B buyers" half)**
 - `POST /ondc/webhook` — parse an inbound Beckn `search` action.
 - Map an internal `GET /catalog/listings?query=...` result into a correctly-shaped `on_search` Beckn response — see the sequence diagram and honesty framing in `ARCHITECTURE.md` §5.
 - Wire `select`/`init`/`confirm` into the *existing* `Order` entity and status machine, tagging `sourceChannel = ONDC` — no parallel order system.
-- No gateway registration or request signing in this phase (that requires real network membership, out of scope) — this phase proves the integration seam, not live network participation.
+- Build this behind the `OndcProvider` interface (`ARCHITECTURE.md` §5) so the mocked version below and the real registration in Phase 2c are swappable, not a rewrite.
+- No gateway registration or request signing in this sub-phase — this proves the integration seam with simulated requests, not live network participation. That's Phase 2c, below.
+
+**backend-service (Node.js dev) — GeM export (the "government e-marketplace" half)**
+- Build the GeM-ready catalogue export: map a `Product` record into the fields GeM's seller portal expects (add GST/tax, HSN, origin, packaging/delivery where applicable) — no external dependency, buildable immediately.
+- No `GeMConnector`/live API work in this phase — that's explicitly deferred until GeM grants official integration access (see `ARCHITECTURE.md` §5), same external-approval risk category as the Meta WhatsApp sandbox.
 
 **⚑ Checkpoint B2 — Definition of Done**
 - A simulated Beckn `search` request (via curl/Postman, shaped like a real gateway call) produces a correct `on_search` response built from real catalog data, not a hardcoded fixture.
 - A simulated `select → init → confirm` sequence produces a real `Order` row with `sourceChannel = ONDC`, visible in the same admin/catalog views as any other order.
-- Team has made and documented the GeM decision from §0/`ARCHITECTURE.md` §5.
+- A real `Product` record can be exported into a GeM-compliant catalogue package, reviewable by a human before manual portal upload.
+
+---
+
+### Phase 2c — Real ONDC Pre-Production Registration (genuine, scheduled, not blocking)
+
+Verified against ONDC's own developer documentation (`ARCHITECTURE.md` §5): registration is self-service, ONDC publishes official Node.js signing utilities, and a real pre-production environment exists for exactly this purpose. This is real, multi-week engineering work — sequenced after Phase 2b so it never blocks Checkpoint B2 or anything downstream, and owned by whoever's building `backend-service`'s ONDC piece once that person has bandwidth.
+
+**backend-service (Node.js dev)**
+- Register on the ONDC Participant Portal as a Seller App; complete organisation/participant profile.
+- Generate Ed25519 signing keys + X25519 encryption keys using ONDC's official Node.js reference utilities (don't hand-roll cryptography).
+- Implement `/on_subscribe`, host the registry verification file, complete registry subscription and challenge decryption.
+- Implement `DirectOndcProvider` against the `OndcProvider` interface (`ARCHITECTURE.md` §5), swapping it in behind the same seam Phase 2b already built.
+- Test against ONDC's pre-production registry/gateway endpoints and the ONDC Workbench schema validator — not the decommissioned "staging" environment (terminology from older material is stale).
+
+**⚑ Checkpoint B2c — Definition of Done**
+- The participant appears in a real ONDC registry lookup (pre-production).
+- A real `search → on_search → select → init → confirm` round-trip completes against ONDC's pre-production gateway (not curl-simulated), producing a real `Order` row.
+- Demo/pitch language matches the exact phrasing in `ARCHITECTURE.md` §5 — pre-production, not production, and never overstated.
 
 ---
 
@@ -199,7 +224,7 @@ Promoted out of the stretch-goal queue per §0 — this satisfies a named *Expec
 | Offline sync edge cases (dup submits, partial uploads) | Medium | Explicit airplane-mode test pass in Phase 2, not deferred to Phase 4 |
 | Pricing model has no real market data | High (expected) | Ship explainable baseline early per charter guidance; refine only if time allows, never block on it |
 | Scope creep into stretch goals before ★ priorities are solid | Medium | Scope freeze at Checkpoint C/B2; the scheme-matching rules engine is the one remaining true stretch goal and stays explicitly sequenced last |
-| ONDC connector presented in the pitch as more real than it is | Medium (reputational, not technical) | `ARCHITECTURE.md` §5's honesty framing is mandatory pitch-deck language, not optional caveat — rehearse the exact phrasing in Phase 4 |
+| ONDC or GeM presented in the pitch as more real/automated than it is | Medium (reputational, not technical) | `ARCHITECTURE.md` §5's honesty framing is mandatory pitch-deck language for both — "structurally correct seam" for ONDC, "catalogue export, manual portal upload" for GeM, never "we're live on" either — rehearse the exact phrasing in Phase 4 |
 | Impact-summary numbers get faked/hardcoded under time pressure instead of computed | Medium | Scheduled as a real endpoint + query in Phase 3, checked explicitly at Checkpoint C, not left to a "we'll mock it for the demo" default |
 
 ---
