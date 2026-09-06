@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { generateCatalogue, transcribeAudio, generateCatalogueFromAudio } from '../controllers/aiController.js';
+import { generateCatalogue, transcribeAudio, generateCatalogueFromAudio, getMlHealth, testMlImage, testMlAudio } from '../controllers/aiController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -38,5 +38,10 @@ const uploadMiddleware = (req, res, next) => {
 router.post('/catalogue/generate', protect, generateCatalogue);
 router.post('/speech-to-text', protect, uploadMiddleware, transcribeAudio);
 router.post('/catalogue/generate-from-audio', protect, uploadMiddleware, generateCatalogueFromAudio);
+
+// Temporary test endpoints for ML Integration Foundation
+router.get('/ml-health', getMlHealth);
+router.post('/ml-image-test', testMlImage);
+router.post('/ml-audio-test', testMlAudio);
 
 export default router;
