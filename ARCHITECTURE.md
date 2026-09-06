@@ -128,9 +128,13 @@ Two paths create the exact same `Listing` record — the app path resolves the a
 
 ---
 
-## 5. B2B & government e-marketplace connection (ONDC)
+## 5. B2B & government e-marketplace connection (ONDC + GeM)
 
 The official problem statement names this explicitly in its *Expected Solution*, not just as an impact goal — it is not optional scope. This section supersedes the earlier "known gap" framing: it's a planned integration, sequenced early, not a last-in-line stretch goal.
+
+**Resolved: ONDC and GeM answer two different halves of the PS's phrase, not one feature satisfying both.** The PS says *"connect directly with larger B2B buyers **or** government e-marketplaces"* — two distinct buyer populations. GeM's buyer base is restricted to central government ministries, departments, and CPSEs (Central Public Sector Enterprises) procuring for their own institutional needs — it is not a private B2B or consumer marketplace, and ordinary companies cannot buy through it the way they would on Amazon/IndiaMART/ONDC. So:
+- **ONDC (below)** is the answer to "B2B buyers" (and consumers generally).
+- **GeM** is the literal, separate answer to "government e-marketplace" — it needs its own treatment, not a footnote.
 
 **What we are building — a structurally honest ONDC (Beckn protocol) seller-side connector:**
 
@@ -154,9 +158,31 @@ sequenceDiagram
 **What "structurally honest" means here:**
 - `/ondc/webhook` is a real, working endpoint that correctly parses Beckn `search` actions and responds with a correctly-shaped `on_search` payload built from our real catalog data — not a hardcoded fixture.
 - The `select → init → confirm` order flow reuses the exact same `Order` entity and status machine as app/WhatsApp orders — ONDC is a third ingestion channel into one order pipeline, not a parallel system.
-- **What this deliberately does not claim:** real ONDC network membership, which requires gateway registration and cryptographic request signing we do not have credentials for. The demo and pitch must say explicitly *"here's where a certified connection plugs in"* — never *"we're live on ONDC"*. A mock presented as the real thing is a credibility risk with judges who know the protocol; a mock presented honestly as a structurally-correct integration seam is still a strong, differentiated answer to the PS's explicit ask.
 
-**Government e-Marketplace (GeM) — separate decision, not yet made.** GeM may be the more literal reading of the PS's "government e-marketplace" phrase (as opposed to ONDC, which is a general digital-commerce network the government sponsors). GeM has its own seller-onboarding process outside Beckn. Team decision needed: either (a) treat ONDC as satisfying this requirement and say so explicitly in the pitch, or (b) scope a second thin connector. Track this decision in `ROADMAP.md` §0.
+**Real network registration is genuinely achievable, not a hard wall — corrected from an earlier, overly pessimistic assumption in this doc.** Verified against ONDC's own developer documentation: registration is **self-service** via the ONDC Participant Portal (a technology service provider/TSP is helpful, not mandatory), ONDC publishes **official Node.js signing utilities** (Ed25519 request signing, matching our stack), and there is a real **pre-production environment** for testing without claiming production network membership (note: the old "staging" terminology is deprecated — "pre-production" is the current correct term). Realistic engineering-estimate timelines: ~2–6 weeks for a working pre-production connection, ~4–8 weeks for a reliable one, ~6–12+ weeks for full production certification — treat these as directional, not an official SLA.
+
+- **Phase A (already planned above): the mocked-but-structurally-correct seam** — proves the integration shape using simulated requests, no registration needed. This stays the Checkpoint B2 bar for the demo.
+- **Phase C (new, real, scheduled — not just "an option someone could look into"): attempt actual pre-production registration.** This is genuine multi-week work for whoever owns `backend-service`, sequenced *after* Phase A and not blocking any other checkpoint. Build it behind a provider-neutral interface so the mock and the real thing are swappable:
+  ```text
+  OndcProvider
+    - registerParticipant()
+    - signRequest()
+    - verifyRequest()
+    - search() / select() / init() / confirm()
+    - syncStatus()
+  ```
+  with `DirectOndcProvider` (self-built, using ONDC's official signing utilities) as the target implementation, leaving room for a `TspOndcProvider` later if the team decides a technology service provider is worth the added cost/dependency for production.
+- **What the demo and pitch must say, at every stage short of full production certification:** *"Srijan is built as an ONDC-compatible Seller App — we've implemented the seller-side protocol adapter, signing, and catalogue/order mapping; our demonstration runs against ONDC's pre-production environment; full production participation requires completing ONDC's compliance testing and operational approval."* Never *"we're live on ONDC"* before that's actually true. A mock presented as the real thing is a credibility risk with judges who know the protocol; this phrasing is honest at every phase and still a strong, differentiated answer to the PS's explicit ask.
+
+**Government e-Marketplace (GeM) — resolved plan: catalogue export, not a live integration.**
+
+No confirmed public seller/catalogue API exists for GeM (its site references an "Integration Toolkit," but there's no evidence of an open, self-service API a third party can just start calling). Seller onboarding itself is plausible for an individual artisan directly (a proprietor/artisan-weaver route exists, an aggregator is not universally mandatory) — but real requirements (PAN, bank details, GSTIN, Udyam registration, category-specific certificates) vary by seller situation and aren't fully confirmed public information; anything specific stated to artisans or judges should be verified against GeM's own current seller documentation (gem.gov.in), not assumed from this summary.
+
+Given that, the honest, buildable plan mirrors ONDC's "structurally correct, not network-claimed" principle, one step more conservative:
+
+- **Phase 1 (buildable now, no external dependency):** a **GeM-ready catalogue export** — a function that maps an existing `Product` record (title, category, description, images, price — fields that already exist) into the data package GeM's seller portal expects (adding GST/tax, HSN, origin, packaging/delivery fields where applicable), for the artisan or a facilitator to upload manually through the official GeM portal. This is genuinely useful (removes the "I don't know how to format this for GeM" barrier) without claiming automation that doesn't exist.
+- **Phase 2 (blocked on an external, unpredictable dependency — same risk category as the Meta WhatsApp sandbox approval):** only after GeM grants official API documentation/credentials, build a real `GeMConnector` (`submitCatalogue`, `getCatalogueStatus`, `syncOrders`) — not before.
+- **What this must never claim in a demo or pitch:** "any artisan can automatically become a GeM seller through Srijan," or live GeM order sync. The correct framing is *"Srijan prepares a GeM-compliant catalogue and guides the artisan through the official onboarding process"* — same honesty bar as the ONDC seam above.
 
 **Amazon Karigar / Flipkart Samarth** are separate, non-ONDC seller-onboarding programs. At most this platform could pre-fill an artisan's product data for manual submission to those programs — it cannot auto-create seller accounts on them. Don't conflate these with ONDC in the pitch.
 
@@ -256,6 +282,24 @@ The PS asks for a "robust, scalable backend architecture" as a named requirement
 - **PII handling:** artisan phone numbers, raw (pre-enhancement) photos, and raw voice notes are personal data captured from a vulnerable user population — they should have an explicit retention policy (e.g., raw uploads purged N days after a listing reaches `PUBLISHED` or `FAILED`, keeping only the enhanced/derived assets), not be kept indefinitely by default. This needs a concrete number before launch, not just "we'll handle it."
 - **WhatsApp inbound media** is downloaded from Meta's temporary URL and re-hosted in our own storage — never proxied or linked directly — so a webhook replay or URL leak can't expose an artisan's raw media after the fact.
 
+**DPDP Act (India) compliance — a real, current gap, not a future nice-to-have.** Verified against MeitY's own published DPDP Act text and Rules: there is no blanket data-localization law forcing all processing onto India-hosted infrastructure, so sending voice/photos to Groq/Gemini isn't automatically prohibited. But two things the current build does *not* do at all are required for this to be done properly:
+
+- **Consent must be specific, unbundled, and disclose the actual processor** — a buried Terms-of-Service acceptance is not sufficient for voice/photo processing under DPDP's consent standard (free, specific, informed, given by clear affirmative action, withdrawable). The artisan needs to be told, in their own language, that their voice recording is sent to a named external AI provider (currently Groq for transcription, Gemini for translation/description) and may be processed outside India — as a separate, understandable choice, not folded into a generic signup checkbox. **Nothing like this exists anywhere in `mobile`'s current screens or `backend-service`'s auth flow right now.**
+- **`Srijan` is the Data Fiduciary; Groq/Gemini are Data Processors** (if they only process on our documented instructions) — this means a real relationship to establish (no training on our data without explicit approval, defined retention/deletion, breach notification), not just an API key and a prompt.
+
+**Architectural response — an `AiProcessor` abstraction**, mirroring the `OndcProvider` pattern already adopted for the ONDC connector:
+```text
+AiProcessor
+  - transcribeAudio()
+  - translateText()
+  - generateDescription()
+  - enhanceImage()
+  - deleteInput()
+```
+with `GroqProcessor`/`GeminiProcessor` as the current implementations, and room for an `IndiaHostedProcessor` later — this matters concretely if this project ever becomes a real government-affiliated pilot, where the practical bar (procurement, contractual data-residency requirements) is materially higher than the bare legal minimum even though the DPDP Act itself doesn't mandate it.
+
+**What still needs to be built, concretely (see §11):** a `ConsentRecord` model in `backend-service` (purpose, wording/version, timestamp, language, provider disclosed, withdrawal status), local-language consent screens in `mobile` before first photo/voice capture, the `AiProcessor` abstraction in place of direct Groq/Gemini calls, and an audit check that raw audio/photos/full prompts never end up in application logs. This is a compliance analysis, not legal advice — get an actual Indian privacy-counsel review before any real (non-demo) launch.
+
 ### 9.3 Rate limiting & abuse protection
 - Public unauthenticated endpoints (`GET /catalog/listings`, the ONDC webhook) need basic rate limiting — both are open to the internet by design, which makes them the platform's actual attack surface.
 - `backend-service` → `ml-service` calls should have a request timeout and a small retry budget (not unbounded retries) so one slow ML call can't cascade into a stuck orchestration thread.
@@ -285,10 +329,48 @@ This section exists so nobody mistakes an architectural placeholder for a workin
 | `mobile` | Real Flutter project scaffolded (`pubspec.yaml`, platform folders, `lib/main.dart`) | Onboarding, capture flow, offline queue, catalog UI, and the Section 6 impact dashboard all need building |
 | Buyer discovery / distribution | `GET /catalog/listings` exists and works | SEO and general marketplace push are still open; ONDC (Section 5) is the planned structural answer to "reach buyers beyond our own app," not yet built |
 | ONDC integration | Concrete plan in Section 5 | Not yet implemented — `/ondc/webhook`, the catalog-to-Beckn mapping, and the reused `Order` flow all need building |
-| GeM (Government e-Marketplace) | Not started | Team decision needed on whether ONDC satisfies the PS's "government e-marketplace" phrase or a second connector is required — see Section 5 |
+| GeM (Government e-Marketplace) | Resolved plan in Section 5 (catalogue export, Phase 1) | Not yet implemented — the `Product`-to-GeM-package export function still needs building |
 | Amazon Karigar / Flipkart Samarth | Not integrated | Separate artisan seller-onboarding programs on those platforms; at most this app could pre-fill data for manual submission, not auto-create accounts |
 | `backend-service` business logic | `/health` only, real skeleton in place | Auth, catalog CRUD, orchestration, and the async job-status store (Section 9.4) are all still to be built |
 | `ml-service` business logic | `/image/enhance` and `/price/suggest` built synchronously; `/audio/transcribe`, `/text/translate`, `/text/generate-description` in progress | Async job pattern (Section 9.4) not yet wired into any endpoint — currently all synchronous |
 | Impact measurement (Section 6) | Data model field (`artisanBaselinePrice`, `sourceChannel`) specified | No aggregation endpoint or dashboard screen built yet |
 | Observability (Section 9.1) | Not implemented | No structured logging or correlation ids wired yet |
 | Data retention policy (Section 9.2) | Not decided | Needs an explicit retention window for raw PII before launch |
+| DPDP consent flow (Section 9.2) | Not built — no `ConsentRecord` model, no consent screens anywhere in `mobile`, no `AiProcessor` abstraction, Groq/Gemini called directly | Specific, unbundled, local-language consent disclosing the actual external AI processor before first photo/voice capture; audit that raw media/prompts never land in application logs. Get an actual Indian privacy-counsel review before any real (non-demo) launch. |
+
+---
+
+## 12. Future work — explicitly deferred past the hackathon
+
+This project's current build target is a hackathon demo, not a production launch (see `ROADMAP.md`). Section 11 above lists gaps *within* that scope — things the demo still needs. This section is different: it's everything deliberately **out of scope for the hackathon on purpose**, so it doesn't get mistaken for a forgotten task or accidentally started with hackathon time. Nothing here should be worked on before the demo unless a specific future phase revisits it.
+
+**Marketplace & network integrations**
+- Real ONDC pre-production/production registration (self-service Participant Portal, Ed25519 signing, registry onboarding — Section 5) — genuine multi-week effort; the hackathon demo uses the mocked structural seam only
+- `TspOndcProvider` — whether a technology service provider is worth it for real production, vs. staying direct
+- Real GeM API integration (`GeMConnector`: `submitCatalogue`/`getCatalogueStatus`/`syncOrders`) — blocked on GeM granting official API access; only the catalogue-export half (Section 5) is in scope now
+- Amazon Karigar / Flipkart Samarth — at most manual pre-fill, never auto-account-creation
+
+**Compliance & legal**
+- TRAI DLT registration for MSG91 (Principal Entity registration, approved OTP templates, PE-to-telemarketer mapping) — needed before real production SMS traffic, not for demo/test numbers
+- Full DPDP consent infrastructure: `ConsentRecord` model, consent-version tracking, withdrawal handling, data export/deletion workflows (Section 9.2) — the hackathon ships a single one-line consent screen only
+- Data Protection Officer processes, vendor/processor audit systems, formal Data Processing Agreements with Groq/Gemini
+- An actual Indian privacy-counsel review before any real (non-demo) launch
+
+**Infrastructure & production-hardening**
+- Real Firebase/S3 Storage for enhanced images (currently local disk on `ml-service` — acceptable for a single-instance demo that doesn't restart mid-demo, not for restarts/scaling)
+- Job store TTL/cleanup + a Redis-backed swap (Section 9.4) — currently an unbounded in-memory dict, single-process only
+- Retry/backoff on Groq/Gemini calls — currently fail-once, no resilience
+- Structured logging + correlation IDs across `backend-service` ↔ `ml-service` (Section 9.1)
+- Rate limiting on public endpoints (`GET /catalog/listings`, the ONDC webhook — Section 9.3)
+- Raw-media retention window automation (currently only "documented," not enforced)
+
+**ML / pricing sophistication**
+- Live marketplace data connectors (`InternalCatalogConnector`, `ApprovedMarketplaceConnector`, affiliate/partner feeds) — no real data source exists yet to connect to; the hackathon pricing model stays curated/reference-data-based and says so explicitly
+- Image and text embeddings for similarity/comparable-product retrieval
+- Historical sales learning, price-feedback loops, vector search
+- The `AiProcessor` abstraction's `IndiaHostedProcessor` implementation (Section 9.2) — only matters if this becomes a real government-affiliated pilot
+
+**Testing & architecture**
+- Router-level tests for `ml-service` (currently only pure-logic pieces like `pricing.py`/`jobs.py` are covered)
+- Blur/multi-object/no-clear-subject detection guard for `/image/enhance` (original spec asked for it, never built)
+- Category-inference fallback in `describe.py`, and reconciling the category enum across `mobile`/`backend-service`/`ml-service`
