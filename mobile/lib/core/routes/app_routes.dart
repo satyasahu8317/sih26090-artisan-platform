@@ -1,9 +1,18 @@
 import 'package:go_router/go_router.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_interests_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_language_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_notification_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_order_details_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_payment_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_product_detail_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/buyer_profile_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/chat_with_seller_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/search_screen.dart';
+import 'package:sih26090_mobile/features/buyer/screens/wishlist_screen.dart';
 
 import 'package:sih26090_mobile/features/onboarding/screens/artisan_profile_screen.dart';
 import 'package:sih26090_mobile/features/products/screens/notifications_screen.dart';
 import 'package:sih26090_mobile/features/products/screens/order_track_screen.dart';
-
 import '../../features/products/screens/buyer_opportunities_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
@@ -22,7 +31,7 @@ import '../../features/products/screens/review_edit_listing_screen.dart';
 import '../../features/products/screens/submit_quote_screen.dart';
 import '../../features/products/screens/my_orders_screen.dart';
 import '../../features/products/screens/requirement_detail_screen.dart';
-
+import '../../features/buyer/screens/buyer_onboarding_profile_screen.dart';
 final GoRouter appRouter = GoRouter(
   initialLocation: '/splash',
 
@@ -146,5 +155,49 @@ final GoRouter appRouter = GoRouter(
       path: '/order-track',
       builder: (context, state) => const OrderTrackScreen(),
     ),
+    GoRoute(
+  path: '/buyer-profile',
+  builder: (context, state) => const BuyerOnboardingProfileScreen(),
+),
+GoRoute(
+  path: '/buyer-languages',
+  builder: (context, state) =>
+      const BuyerLanguagesScreen(),
+),GoRoute(
+  path: '/buyer-interests',
+  builder: (context, state) =>
+      const BuyerInterestsScreen(),
+),GoRoute(
+  path: '/buyer-product-detail',
+  builder: (context, state) =>
+      const BuyerProductDetailScreen(),
+),GoRoute(
+  path: '/chat-with-seller',
+  builder: (context, state) =>
+      const ChatWithSellerScreen(),
+),GoRoute(
+  path: '/buyer-search',
+  builder: (context, state) => const SearchScreen(),
+),
+GoRoute(
+  path: '/buyer-order-details',
+  builder: (context, state) =>
+      const BuyerOrderDetailsScreen(),
+),GoRoute(
+  path: '/buyer-profile',
+  builder: (context, state) =>
+      const BuyerProfileScreen(),
+),GoRoute(
+  path: '/wishlist',
+  builder: (context, state) => const WishlistScreen(),
+),GoRoute(
+  path: '/buyer-notifications',
+  builder: (context, state) =>
+      const BuyerNotificationsScreen(),
+),GoRoute(
+  path: '/buyer-payment',
+  builder: (context, state) =>
+      const BuyerPaymentScreen(),
+),
   ],
 );

@@ -67,10 +67,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   if (role == 'seller') {
     // Seller/Artisan onboarding
     context.go('/profile');
-  } else if (role == 'buyer') {
-    // Buyer flow
-    context.go('/buyer-home');
-  }
+  }else if (role == 'buyer') {
+  context.go('/buyer-profile');
+}
 }
 
   @override

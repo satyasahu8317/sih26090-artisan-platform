@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:go_router/go_router.dart';
 class BuyerHomeScreen extends StatefulWidget {
   const BuyerHomeScreen({super.key});
 
@@ -119,36 +119,45 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
             ],
           ),
         ),
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text(
-              '🔔',
-              style: TextStyle(fontSize: 20),
-            ),
-          ),
+   GestureDetector(
+  onTap: () {
+    context.push('/buyer-notification');
+  },
+  child: Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 8,
+          offset: const Offset(0, 3),
         ),
+      ],
+    ),
+    child: const Center(
+      child: Text(
+        '🔔',
+        style: TextStyle(fontSize: 20),
+      ),
+    ),
+  ),
+),
       ],
     );
   }
 
   // ---------------- SEARCH ----------------
-
-  Widget _buildSearchBar() {
-    return Container(
+Widget _buildSearchBar() {
+  return GestureDetector(
+    onTap: () {
+      context.push('/buyer-search');
+    },
+    child: Container(
       height: 52,
+ 
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -191,7 +200,7 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
           ),
         ],
       ),
-    );
+   ) );
   }
 
   // ---------------- CATEGORY CHIPS ----------------
@@ -441,7 +450,11 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
   }
 
   Widget _buildProductCard(Map<String, String> product) {
-    return Container(
+  return GestureDetector(
+    onTap: () {
+      context.push('/buyer-product-detail');
+    },
+    child: Container(
       width: 105,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -461,7 +474,8 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
               product['image']!,
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) {
-                return Container(
+                return 
+                Container(
                   color: const Color(0xFFE8D8C0),
                   child: const Center(
                     child: Icon(
@@ -529,7 +543,7 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
           ),
         ],
       ),
-    );
+   ), );
   }
 
   // ---------------- BOTTOM NAV ----------------
@@ -562,11 +576,21 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
             final selected = selectedNav == index;
 
             return GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedNav = index;
-                });
-              },
+            onTap: () {
+  setState(() {
+    selectedNav = index;
+  });
+
+  if (index == 0) {
+    context.go('/buyer-home');
+  } else if (index == 1) {
+    context.push('/buyer-search');
+  } else if (index == 3) {
+    context.push('/buyer-orders');
+  } else if (index == 4) {
+    context.push('/buyer-profile');
+  }
+},
               child: SizedBox(
                 width: 62,
                 child: Column(
