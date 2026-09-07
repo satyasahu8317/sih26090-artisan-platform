@@ -120,7 +120,7 @@ export const testMlImage = async (req, res, next) => {
 
     const { jobId } = await mlClient.startImageEnhancement(imageUrl);
     const finalResult = await mlClient.pollJobStatus(mlClient.getImageEnhancementStatus, jobId);
-    
+
     res.status(200).json({ success: true, data: finalResult });
   } catch (error) {
     next(error);
@@ -137,14 +137,14 @@ export const testMlAudio = async (req, res, next) => {
 
     const { jobId } = await mlClient.startAudioTranscription(audioUrl, null, hintLanguage);
     const finalResult = await mlClient.pollJobStatus(mlClient.getAudioTranscriptionStatus, jobId);
-    
+
     res.status(200).json({ success: true, data: finalResult });
   } catch (error) {
     next(error);
   }
 };
 
-import { firebaseStorageService } from '../services/firebaseStorage.js';
+import { b2StorageService } from '../services/b2Storage.js';
 
 export const uploadMediaImage = async (req, res, next) => {
   try {
@@ -163,12 +163,11 @@ export const uploadMediaImage = async (req, res, next) => {
       throw new Error('Artisan profile not found');
     }
 
-    const { url, path } = await firebaseStorageService.uploadCatalogueMedia(
+    const { url, path } = await b2StorageService.uploadImage(
       req.file.buffer,
-      artisanProfile.id,
-      'image',
       req.file.originalname,
-      req.file.mimetype
+      req.file.mimetype,
+      artisanProfile.id
     );
 
     res.status(201).json({
@@ -197,12 +196,11 @@ export const uploadMediaAudio = async (req, res, next) => {
       throw new Error('Artisan profile not found');
     }
 
-    const { url, path } = await firebaseStorageService.uploadCatalogueMedia(
+    const { url, path } = await b2StorageService.uploadAudio(
       req.file.buffer,
-      artisanProfile.id,
-      'audio',
       req.file.originalname,
-      req.file.mimetype
+      req.file.mimetype,
+      artisanProfile.id
     );
 
     res.status(201).json({
@@ -266,7 +264,7 @@ export const generateFullCatalogue = async (req, res, next) => {
         })()
       );
     }
-    
+
     if (audioUrl) {
       startJobs.push(
         (async () => {
@@ -311,10 +309,10 @@ export const generateFullCatalogue = async (req, res, next) => {
     // 4. Translate and Describe
     if (transcript) {
       const translateRes = await mlClient.translateText(transcript, transcriptionData.detectedLanguage, ['en', 'hi']);
-      
+
       const translatedEn = translateRes.translations['en'];
       const descRes = await mlClient.generateDescription(translatedEn, category, keywords);
-      
+
       descriptionEn = descRes.descriptionEn;
       descriptionHi = descRes.descriptionHi;
       seoKeywords = descRes.seoKeywords;

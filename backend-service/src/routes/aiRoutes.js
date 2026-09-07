@@ -11,7 +11,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = file.originalname.split('.').pop().toLowerCase();
     const allowedExts = ['m4a', 'mp3', 'wav', 'webm', 'ogg', 'mp4', 'mpeg', 'mpga', 'flac'];
-    
+
     if (allowedExts.includes(ext)) {
       cb(null, true);
     } else {
@@ -35,7 +35,7 @@ const uploadMiddleware = (req, res, next) => {
   });
 };
 
-// New memory storage for Firebase uploads
+// Memory storage for B2 media uploads
 const memoryUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max (we'll limit image to 10MB in filter)
@@ -104,7 +104,7 @@ router.get('/ml-health', getMlHealth);
 router.post('/ml-image-test', testMlImage);
 router.post('/ml-audio-test', testMlAudio);
 
-// New Firebase Storage Upload Endpoints
+// Media Storage Upload Endpoints
 router.post('/media/image', protect, imageUploadMiddleware, uploadMediaImage);
 router.post('/media/audio', protect, audioUploadMiddleware, uploadMediaAudio);
 
