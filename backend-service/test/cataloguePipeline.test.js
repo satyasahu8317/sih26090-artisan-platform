@@ -115,7 +115,7 @@ describe('Catalogue Pipeline API', () => {
       await prisma.product.deleteMany({ where: { id: createdProductId } });
       createdProductId = null;
     }
-    
+
     await prisma.artisanProfile.deleteMany({ where: { userId: 'user-artisan' } });
     await prisma.user.deleteMany({ where: { id: 'user-artisan' } });
     await prisma.user.deleteMany({ where: { id: 'user-buyer' } });
@@ -125,7 +125,7 @@ describe('Catalogue Pipeline API', () => {
     const res = await request(app)
       .post('/api/v1/ai/catalogue/ml-generate')
       .send({ productName: { en: 'test', hi: 'test' }, category: 'wood' });
-    
+
     assert.strictEqual(res.statusCode, 401);
   });
 
@@ -134,7 +134,7 @@ describe('Catalogue Pipeline API', () => {
       .post('/api/v1/ai/catalogue/ml-generate')
       .set('Authorization', `Bearer ${buyerToken}`)
       .send({ productName: { en: 'test', hi: 'test' }, category: 'wood' });
-    
+
     assert.strictEqual(res.statusCode, 403);
     assert.match(res.body.message, /Only artisans/);
   });
@@ -154,10 +154,10 @@ describe('Catalogue Pipeline API', () => {
       .post('/api/v1/ai/catalogue/ml-generate')
       .set('Authorization', `Bearer ${artisanToken}`)
       .send(payload);
-    
+
     assert.strictEqual(res.statusCode, 201);
     assert.strictEqual(res.body.success, true);
-    
+
     const data = res.body.data;
     createdProductId = data.id;
 
@@ -170,7 +170,7 @@ describe('Catalogue Pipeline API', () => {
       hi: 'एक सुंदर लकड़ी का खिलौना।'
     });
     assert.deepStrictEqual(data.tags, ['wood', 'toy']);
-    
+
     // Check pricing object mapped out to response
     assert.strictEqual(data.pricing.suggestedPriceMin, 100);
     assert.strictEqual(data.pricing.suggestedPriceMax, 200);
@@ -215,10 +215,10 @@ describe('Catalogue Pipeline API', () => {
       .post('/api/v1/ai/catalogue/ml-generate')
       .set('Authorization', `Bearer ${artisanToken}`)
       .send(payload);
-    
+
     assert.strictEqual(res.statusCode, 502);
     assert.strictEqual(res.body.success, false);
-    
+
     // Assert DB is empty for this artisan
     const products = await prisma.product.findMany({ where: { artisanId: artisanProfile.id } });
     assert.strictEqual(products.length, 0);
@@ -234,7 +234,7 @@ describe('Catalogue Pipeline API', () => {
       .post('/api/v1/ai/catalogue/ml-generate')
       .set('Authorization', `Bearer ${artisanToken}`)
       .send(payload);
-    
+
     assert.strictEqual(res.statusCode, 400);
     assert.match(res.body.message, /At least one of imageUrl or audioUrl must be provided/);
   });
@@ -250,11 +250,97 @@ describe('Catalogue Pipeline API', () => {
       .post('/api/v1/ai/catalogue/ml-generate')
       .set('Authorization', `Bearer ${artisanToken}`)
       .send(payload);
-    
+
     assert.strictEqual(res.statusCode, 201);
     assert.strictEqual(res.body.success, true);
     assert.strictEqual(res.body.data.description.en, 'No description provided.');
-    
+
+    createdProductId = res.body.data.id;
+  });
+
+  it('7. should handle only audio safely', async () => {
+    const payload = {
+      productName: { en: 'Audio Craft', hi: 'ऑडियो शिल्प' },
+      category: 'Wood Craft',
+      audioUrl: 'https://s3.us-east-005.backblazeb2.com/sihartisanmedia/catalogue/aud.mp3?X-Amz-Expires=3600&X-Amz-Signature=sig123'
+    };
+
+    const res = await request(app)
+      .post('/api/v1/ai/catalogue/ml-generate')
+      .set('Authorization', `Bearer ${artisanToken}`)
+      .send(payload);
+
+    assert.strictEqual(res.statusCode, 201);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.data.imageUrl, null);
+    assert.strictEqual(res.body.data.description.en, 'A beautiful wooden toy.');
+
+    createdProductId = res.body.data.id;
+  });
+
+  it('8. should pass temporary signed B2 URLs directly to ML service endpoints', async () => {
+    let capturedImageEnhanceBody = null;
+    let capturedAudioTranscribeBody = null;
+
+    mock.method(global, 'fetch', async (url, options) => {
+      if (url.includes('/image/enhance') && options.method === 'POST') {
+        capturedImageEnhanceBody = JSON.parse(options.body);
+        return { ok: true, json: async () => ({ jobId: 'img-123' }) };
+      }
+      if (url.includes('/image/enhance/img-123') && options.method === 'GET') {
+        return { ok: true, json: async () => ({ status: 'SUCCESS', result: { enhancedImageUrl: 'https://enhanced.com/img.jpg' } }) };
+      }
+      if (url.includes('/audio/transcribe') && options.method === 'POST') {
+        capturedAudioTranscribeBody = JSON.parse(options.body);
+        return { ok: true, json: async () => ({ jobId: 'aud-123' }) };
+      }
+      if (url.includes('/audio/transcribe/aud-123') && options.method === 'GET') {
+        return { ok: true, json: async () => ({ status: 'SUCCESS', result: { transcript: 'Wooden toy', detectedLanguage: 'en', confidence: 0.99 } }) };
+      }
+      if (url.includes('/text/translate') && options.method === 'POST') {
+        return { ok: true, json: async () => ({ translations: { 'en': 'Wooden toy translated' } }) };
+      }
+      if (url.includes('/text/generate-description') && options.method === 'POST') {
+        return { ok: true, json: async () => ({
+          descriptionEn: 'A beautiful wooden toy.',
+          descriptionHi: 'एक सुंदर लकड़ी का खिलौना।',
+          seoKeywords: ['wood', 'toy']
+        }) };
+      }
+      if (url.includes('/price/suggest') && options.method === 'POST') {
+        return { ok: true, json: async () => ({
+          suggestedPriceMin: 100,
+          suggestedPriceMax: 200,
+          currency: 'INR',
+          explanation: 'Based on materials.',
+          featuresUsed: ['category']
+        }) };
+      }
+      return { ok: false, status: 404, json: async () => ({ detail: 'Not found' }) };
+    });
+
+    const signedB2ImageUrl = 'https://s3.us-east-005.backblazeb2.com/sihartisanmedia/catalogue/art/uuid/image-pot.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=abc';
+    const signedB2AudioUrl = 'https://s3.us-east-005.backblazeb2.com/sihartisanmedia/catalogue/art/uuid/audio-rec.m4a?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=def';
+
+    const payload = {
+      productName: { en: 'Handmade Pot', hi: 'हाथ का घड़ा' },
+      category: 'Clay Craft',
+      imageUrl: signedB2ImageUrl,
+      audioUrl: signedB2AudioUrl
+    };
+
+    const res = await request(app)
+      .post('/api/v1/ai/catalogue/ml-generate')
+      .set('Authorization', `Bearer ${artisanToken}`)
+      .send(payload);
+
+    assert.strictEqual(res.statusCode, 201);
+    assert.strictEqual(res.body.success, true);
+
+    // Assert ML service received the exact usable signed B2 URLs
+    assert.strictEqual(capturedImageEnhanceBody.imageUrl, signedB2ImageUrl);
+    assert.strictEqual(capturedAudioTranscribeBody.audioUrl, signedB2AudioUrl);
+
     createdProductId = res.body.data.id;
   });
 });

@@ -9,12 +9,13 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
-    "firebase-admin": "^14.3.0",
     "groq-sdk": "^1.6.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
