@@ -253,8 +253,11 @@ export const getMe = async (req, res, next) => {
       ? `/${user.role.toLowerCase()}/register`
       : `/${user.role.toLowerCase()}/home`;
 
+    // Strip private OTP / internal auth fields before returning to client
+    const { otpHash, otpExpiresAt, otpAttempts, ...safeUser } = user;
+
     res.status(200).json({
-      user,
+      user: safeUser,
       redirect,
     });
   } catch (error) {
