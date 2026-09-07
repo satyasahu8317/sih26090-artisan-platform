@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { describe, it, before, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 // Ensure test environment variables exist before importing b2Client / b2StorageService
 process.env.B2_ENDPOINT = process.env.B2_ENDPOINT || 'https://s3.us-east-005.backblazeb2.com';
@@ -13,6 +13,16 @@ const { b2Client } = await import('../src/config/b2.js');
 describe('B2 Storage Service Unit Tests', () => {
   let sentCommands = [];
   const originalEnvExpires = process.env.B2_SIGNED_URL_EXPIRES_SECONDS;
+
+  before(() => {
+    process.env.B2_ENDPOINT = process.env.B2_ENDPOINT || 'https://s3.us-east-005.backblazeb2.com';
+    process.env.B2_REGION = process.env.B2_REGION || 'us-east-005';
+    process.env.B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || 'sihartisanmedia';
+
+    if (b2Client && b2Client.config) {
+      b2Client.config.region = async () => process.env.B2_REGION || 'us-east-005';
+    }
+  });
 
   beforeEach(() => {
     sentCommands = [];
@@ -29,6 +39,7 @@ describe('B2 Storage Service Unit Tests', () => {
 
   describe('Filename Sanitization & Path Traversal Prevention', () => {
     it('1. should strip directory traversal sequences', () => {
+      assert.strictEqual(sanitizeFilename('../../calc.exe'), 'calc.exe');
       assert.strictEqual(sanitizeFilename('../../evil.jpg'), 'evil.jpg');
       assert.strictEqual(sanitizeFilename('../../../secret/photo.png'), 'photo.png');
       assert.strictEqual(sanitizeFilename('C:\\Windows\\System32\\calc.exe'), 'calc.exe');

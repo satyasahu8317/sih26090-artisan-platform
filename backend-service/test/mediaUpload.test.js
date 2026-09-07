@@ -1,4 +1,4 @@
-import { describe, it, before, beforeEach, afterEach, mock } from 'node:test';
+import { describe, it, before, after, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 import request from 'supertest';
 import express from 'express';
@@ -51,11 +51,6 @@ describe('Media Upload API (Backblaze B2)', () => {
         contentType: mimeType
       };
     });
-  });
-
-  beforeEach(async () => {
-    fs.writeFileSync(testImageFile, Buffer.from('fake image content'));
-    fs.writeFileSync(testAudioFile, Buffer.from('fake audio content'));
 
     await prisma.artisanProfile.deleteMany({ where: { userId: 'user-artisan-media' } });
     await prisma.user.deleteMany({ where: { id: 'user-artisan-media' } });
@@ -94,10 +89,17 @@ describe('Media Upload API (Backblaze B2)', () => {
     });
   });
 
-  afterEach(async () => {
+  beforeEach(() => {
+    fs.writeFileSync(testImageFile, Buffer.from('fake image content'));
+    fs.writeFileSync(testAudioFile, Buffer.from('fake audio content'));
+  });
+
+  afterEach(() => {
     if (fs.existsSync(testImageFile)) fs.unlinkSync(testImageFile);
     if (fs.existsSync(testAudioFile)) fs.unlinkSync(testAudioFile);
+  });
 
+  after(async () => {
     await prisma.artisanProfile.deleteMany({ where: { userId: 'user-artisan-media' } });
     await prisma.user.deleteMany({ where: { id: 'user-artisan-media' } });
     await prisma.user.deleteMany({ where: { id: 'user-buyer-media' } });

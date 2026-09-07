@@ -13,11 +13,17 @@ export const sanitizeFilename = (originalName) => {
   if (!originalName || typeof originalName !== 'string') {
     return 'media';
   }
-  // Strip directory paths (e.g., ../../../evil.jpg -> evil.jpg)
-  const baseName = path.basename(originalName);
-  // Replace all non-alphanumeric, non-period, non-hyphen, non-underscore chars
-  const sanitized = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
-  return sanitized || 'media';
+  // Normalize both Windows (\) and POSIX (/) path separators to '/'
+  const normalized = originalName.replace(/\\/g, '/');
+  // Extract basename using POSIX path semantics
+  const baseName = path.posix.basename(normalized);
+  // Strip any Windows drive letter prefix if present (e.g., C:calc.exe -> calc.exe)
+  const cleanBase = baseName.replace(/^[a-zA-Z]:/, '');
+  // Replace characters other than alphanumeric, period, hyphen, and underscore with underscore
+  const sanitized = cleanBase.replace(/[^a-zA-Z0-9._-]/g, '_');
+  // Strip leading dots to prevent hidden files or relative path evasion
+  const noLeadingDots = sanitized.replace(/^\.+/, '');
+  return noLeadingDots || 'media';
 };
 
 /**
