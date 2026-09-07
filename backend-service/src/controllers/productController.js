@@ -187,10 +187,9 @@ export const getProduct = async (req, res, next) => {
 
     // Buyer: can view any PUBLISHED product with public artisan summary
     if (user.role === 'BUYER') {
-      const product = await prisma.product.findFirst({
+      const product = await prisma.product.findUnique({
         where: {
           id: req.params.id,
-          status: 'PUBLISHED',
         },
         include: {
           artisan: {
@@ -208,6 +207,11 @@ export const getProduct = async (req, res, next) => {
       if (!product) {
         res.status(404);
         throw new Error('Product not found');
+      }
+
+      if (product.status !== 'PUBLISHED') {
+        res.status(403);
+        throw new Error('Product not found or unauthorized');
       }
 
       return res.status(200).json({ success: true, data: product });

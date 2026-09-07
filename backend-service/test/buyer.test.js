@@ -307,11 +307,11 @@ describe('Buyer API Tests', () => {
     assert.ok(!body.data.artisan.userId);
   });
 
-  it('15. Buyer cannot view a DRAFT product (404)', async () => {
+  it('15. Buyer cannot view a DRAFT product (403)', async () => {
     const { status } = await api('GET', `/api/v1/products/${draftProductId}`, {
       token: buyerToken,
     });
-    assert.equal(status, 404);
+    assert.equal(status, 403);
   });
 
   it('16. Artisan can still view their own product (existing behavior)', async () => {
