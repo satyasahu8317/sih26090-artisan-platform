@@ -1,7 +1,14 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { b2StorageService, sanitizeFilename } from '../src/services/b2Storage.js';
-import { b2Client } from '../src/config/b2.js';
+// Ensure test environment variables exist before importing b2Client / b2StorageService
+process.env.B2_ENDPOINT = process.env.B2_ENDPOINT || 'https://s3.us-east-005.backblazeb2.com';
+process.env.B2_REGION = process.env.B2_REGION || 'us-east-005';
+process.env.B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || 'sihartisanmedia';
+process.env.B2_KEY_ID = process.env.B2_KEY_ID || 'dummy-ci-key-id';
+process.env.B2_APPLICATION_KEY = process.env.B2_APPLICATION_KEY || 'dummy-ci-application-key';
+
+const { b2StorageService, sanitizeFilename } = await import('../src/services/b2Storage.js');
+const { b2Client } = await import('../src/config/b2.js');
 
 describe('B2 Storage Service Unit Tests', () => {
   let sentCommands = [];
