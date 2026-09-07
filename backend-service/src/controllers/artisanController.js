@@ -194,3 +194,36 @@ export const getArtisanEnquiries = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/v1/artisans/:id
+ * Public artisan profile lookup — safe fields only.
+ * Accessible to any authenticated user (buyer or artisan).
+ * NEVER exposes userId, mobileNumber, OTP fields, or private data.
+ */
+export const getPublicArtisanProfile = async (req, res, next) => {
+  try {
+    const profile = await prisma.artisanProfile.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        craftType: true,
+        state: true,
+        district: true,
+        preferredLanguage: true,
+        // userId is intentionally excluded — never expose user relation
+      },
+    });
+
+    if (!profile) {
+      res.status(404);
+      throw new Error('Artisan not found');
+    }
+
+    res.status(200).json({ success: true, data: profile });
+  } catch (error) {
+    next(error);
+  }
+};
+
