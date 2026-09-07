@@ -102,6 +102,83 @@ export const verifyOtp = async (req, res, next) => {
   }
 };
 
+export const verifyMsg91 = async (req, res, next) => {
+  try {
+    const { accessToken, role } = req.body;
+
+    if (!accessToken) {
+      res.status(400);
+      throw new Error('Please provide MSG91 accessToken');
+    }
+
+    // Call isolated service
+    const { verifyMsg91AccessToken } = await import('../services/msg91Service.js');
+    const msg91Result = await verifyMsg91AccessToken(accessToken);
+    const mobileNumber = msg91Result.mobileNumber;
+
+    let user;
+
+    if (role) {
+      // First try with mobileNumber and role if provided
+      user = await prisma.user.findUnique({
+        where: {
+          mobileNumber_role: { mobileNumber, role },
+        },
+      });
+    }
+
+    if (!user) {
+      // If role wasn't provided or user not found with that role, try to find any user with that mobile
+      const users = await prisma.user.findMany({
+        where: { mobileNumber },
+      });
+
+      if (users.length === 1) {
+        user = users[0];
+      } else if (users.length > 1 && !role) {
+        res.status(400);
+        throw new Error('Multiple accounts found for this mobile number. Please specify a role.');
+      }
+    }
+
+    // If still no user, we must create one. 
+    if (!user) {
+      if (!role) {
+        res.status(400);
+        throw new Error('Role is required for new user registration');
+      }
+
+      user = await prisma.user.create({
+        data: {
+          mobileNumber,
+          role,
+          status: 'PENDING',
+        },
+      });
+    }
+
+    // Ensure OTP cleanup is done safely
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { otpHash: null, otpExpiresAt: null, otpAttempts: 0 },
+    });
+
+    const token = generateToken(user.id);
+    const isNewUser = user.status === 'PENDING';
+    const activeRole = user.role;
+    const redirect = isNewUser
+      ? `/${activeRole.toLowerCase()}/register`
+      : `/${activeRole.toLowerCase()}/home`;
+
+    res.status(200).json({ token, isNewUser, redirect });
+  } catch (error) {
+    if (error.message.includes('MSG91') || error.message.includes('extract mobile')) {
+      res.status(401); // Unauthorized if it's a token validation issue
+    }
+    next(error);
+  }
+};
+
 export const register = async (req, res, next) => {
   try {
     const user = req.user;

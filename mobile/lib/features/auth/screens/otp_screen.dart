@@ -1,15 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class OtpScreen extends StatefulWidget {
+import '../../onboarding/providers/onboarding_provider.dart';
+
+class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key});
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends ConsumerState<OtpScreen> {
   final List<TextEditingController> _controllers =
       List.generate(4, (_) => TextEditingController());
 
@@ -57,6 +61,18 @@ class _OtpScreenState extends State<OtpScreen> {
     return _controllers.map((controller) => controller.text).join();
   }
 
+ void _verifyOtp() {
+  final role = ref.read(selectedRoleProvider);
+
+  if (role == 'seller') {
+    // Seller/Artisan onboarding
+    context.go('/profile');
+  } else if (role == 'buyer') {
+    // Buyer flow
+    context.go('/buyer-home');
+  }
+}
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -102,9 +118,9 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                     child: IconButton(
-                    onPressed: () {
-  context.go('/login');
-},
+                      onPressed: () {
+                        context.go('/login');
+                      },
                       icon: const Icon(
                         Icons.arrow_back,
                         color: darkBrown,
@@ -115,9 +131,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
                   const SizedBox(width: 12),
 
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Verify Mobile Number',
                         style: TextStyle(
@@ -154,7 +170,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color:Colors.black.withValues(alpha: 0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -183,7 +199,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha:0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 3,
                           ),
                         ],
@@ -344,37 +360,37 @@ class _OtpScreenState extends State<OtpScreen> {
                   },
                 ),
               ),
-// ---------------- VERIFY OTP ----------------
-const SizedBox(height: 24),
 
-SizedBox(
-  width: double.infinity,
-  height: 56,
-  child: ElevatedButton(
-    onPressed: _otp.length == 4
-        ? () {
-            context.go('/language');
-          }
-        : null,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF8B5E34),
-      disabledBackgroundColor:
-          const Color(0xFF8B5E34).withValues(alpha:0.4),
-      foregroundColor: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
-    ),
-    child: const Text(
-      'Verify OTP →',
-      style: TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  ),
-),
+              // ---------------- VERIFY OTP ----------------
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _otp.length == 4
+                      ? _verifyOtp
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5E34),
+                    disabledBackgroundColor:
+                        const Color(0xFF8B5E34).withValues(alpha: 0.4),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Verify OTP →',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 20),
 
               // ---------------- DOTS ----------------
@@ -474,9 +490,9 @@ SizedBox(
               const SizedBox(height: 14),
 
               // ---------------- SECURITY ----------------
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Icon(
                     Icons.shield_outlined,
                     size: 17,

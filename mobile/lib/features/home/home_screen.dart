@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../products/screens/add_product_screen.dart';
+import 'package:go_router/go_router.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -39,16 +40,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildShopOverview(),
 
                         const SizedBox(height: 16),
+_buildAIAssistant(),
 
-                        _buildAIAssistant(),
+const SizedBox(height: 16),
 
-                        const SizedBox(height: 16),
+_buildBuyerOpportunity(),
 
-                        _buildQuickActions(),
+const SizedBox(height: 16),
 
-                        const SizedBox(height: 16),
-
-                        _buildBuyerOpportunity(),
+_buildQuickActions(),
+                       
 
                         const SizedBox(height: 20),
                       ],
@@ -213,14 +214,9 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AddProductScreen(),
-      ),
-    );
-  },
+              onPressed: () {
+                context.go('/add-product');
+              },
 
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF941E0B),
@@ -395,6 +391,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Orders & Enquiries',
                 subtitle: '3 new',
                 iconBackground: const Color(0xFFE8F0D6),
+                onTap: () {
+                  context.push('/my-orders');
+                },
               ),
             ),
           ],
@@ -410,19 +409,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Notifications',
                 subtitle: '3 New Updates',
                 iconBackground: const Color(0xFFF7E4C1),
+                onTap: () {
+                  context.push('/notifications');
+                },
               ),
             ),
 
             const SizedBox(width: 10),
-
-            Expanded(
-              child: _buildActionCard(
-                icon: '👤',
-                title: 'My Profile',
-                subtitle: 'View & Edit',
-                iconBackground: const Color(0xFFE6EED2),
-              ),
-            ),
+_buildActionCard(
+  icon: '👤',
+  title: 'My Profile',
+  subtitle: 'View & Edit',
+  iconBackground: const Color(0xFFE6EED2),
+  onTap: () {
+    context.push('/artisan-profile');
+  },
+),
           ],
         ),
       ],
@@ -433,10 +435,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required String icon,
     required String title,
     required String subtitle,
-    Color iconBackground = const Color(0xFFF5E1D0),
+    Color iconBackground = const Color(0xFFF5E1D0), 
+    VoidCallback? onTap,
   }) {
-    return Container(
-      height: 70,
+  return GestureDetector(
+  onTap: onTap,
+  child: Container(
+    height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -500,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
+   ), );
   }
 
   // =========================================================
@@ -682,12 +687,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           // Center + button
-          Positioned(
-            top: -11,
-            child: GestureDetector(
-              onTap: () {
-               
-              },
+        Positioned(
+  top: -11,
+  child: GestureDetector(
+    onTap: () {
+      context.go('/add-product');
+    },
               child: Container(
                 width: 60,
                 height: 60,

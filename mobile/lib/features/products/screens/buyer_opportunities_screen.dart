@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 class BuyerOpportunitiesScreen extends StatefulWidget {
   const BuyerOpportunitiesScreen({super.key});
 
@@ -462,7 +463,9 @@ class _BuyerOpportunitiesScreenState
                       child: SizedBox(
                         height: 44,
                         child: ElevatedButton(
-                          onPressed: () {},
+  onPressed: () {
+    context.push('/submit-quote');
+  },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF8B5E34),
                             foregroundColor: Colors.white,

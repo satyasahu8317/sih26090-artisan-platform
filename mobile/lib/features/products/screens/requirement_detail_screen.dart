@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 class RequirementDetailScreen extends StatelessWidget {
   const RequirementDetailScreen({super.key});
 
@@ -131,9 +132,9 @@ class RequirementDetailScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: connect with backend
-                      },
+                   onPressed: () {
+  context.push('/submit-quote');
+},
                       icon: const Icon(
                         Icons.check,
                         size: 20,
@@ -156,43 +157,8 @@ class RequirementDetailScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
 
-                  // Partial fulfil
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: connect with backend
-                      },
-                      icon: const Text(
-                        '↪',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: brown,
-                        ),
-                      ),
-                      label: const Text(
-                        'I Can Partially Fulfill',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: brown,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        side: const BorderSide(
-                          color: brown,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
+                 
 
                   const SizedBox(height: 10),
 

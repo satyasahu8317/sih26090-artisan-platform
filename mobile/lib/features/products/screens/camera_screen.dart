@@ -1,7 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'product_details_screen.dart';
+import 'product_description_screen.dart';
 
 
 class CameraScreen extends StatefulWidget {
@@ -108,16 +108,12 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
- void _usePhoto() {
+void _usePhoto() {
   if (_capturedImage == null) return;
 
-  Navigator.pushReplacement(
+  Navigator.pop(
     context,
-    MaterialPageRoute(
-      builder: (_) => ProductDetailsScreen(
-        imagePath: _capturedImage!.path,
-      ),
-    ),
+    _capturedImage!.path,
   );
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/onboarding_provider.dart';
 
@@ -133,14 +134,11 @@ class _RoleSelectionScreenState
                 width: double.infinity,
                 height: 58,
                 child: ElevatedButton(
-                  onPressed: selectedRole == null
-                      ? null
-                      : () {
-                          // Navigation baad mein add karenge.
-                          debugPrint(
-                            'Selected role: $selectedRole',
-                          );
-                        },
+              onPressed: selectedRole == null
+    ? null
+    : () {
+        context.go('/login');
+      },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brown,
                     disabledBackgroundColor:

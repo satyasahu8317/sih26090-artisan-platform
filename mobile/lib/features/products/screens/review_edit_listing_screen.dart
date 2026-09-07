@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 class ReviewEditListingScreen extends StatefulWidget {
-  const ReviewEditListingScreen({super.key});
+  final String? imagePath;
+
+  const ReviewEditListingScreen({
+    super.key,
+    this.imagePath,
+  });
 
   @override
   State<ReviewEditListingScreen> createState() =>
@@ -10,14 +17,20 @@ class ReviewEditListingScreen extends StatefulWidget {
 
 class _ReviewEditListingScreenState
     extends State<ReviewEditListingScreen> {
-  final TextEditingController productNameController =
+  static const background = Color(0xFFF6F1E7);
+  static const brown = Color(0xFF8B5E34);
+  static const darkBrown = Color(0xFF604532);
+  static const borderBrown = Color(0xFFD2B48C);
+
+  final productNameController =
       TextEditingController(text: 'Blue Pottery Vase');
 
-  final TextEditingController descriptionController =
-      TextEditingController(
+  final descriptionController = TextEditingController(
     text:
         'Handcrafted blue pottery vase made using traditional techniques by skilled artisans of Jaipur, Rajasthan.',
   );
+
+  String selectedColor = 'Blue';
 
   @override
   void dispose() {
@@ -29,91 +42,46 @@ class _ReviewEditListingScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF9EF),
+      backgroundColor: background,
       body: SafeArea(
         child: Column(
           children: [
-            // =========================================================
-            // MAIN CONTENT
-            // =========================================================
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // =================================================
-                    // HEADER
-                    // =================================================
-                    Row(
-                      children: [
-                        _backButton(),
+                    _header(),
 
-                        const SizedBox(width: 14),
+                    const SizedBox(height: 14),
 
-                        Expanded(
-                          child: Text(
-                            'Review & Edit Listing',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF5C4033),
-                              fontFamily: 'Playfair Display',
-                            ),
-                          ),
-                        ),
-
-                        const Text(
-                          '✏️',
-                          style: TextStyle(fontSize: 20),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // =================================================
-                    // PRODUCT IMAGE
-                    // =================================================
-                    _productImageCard(),
+                    _productImage(),
 
                     const SizedBox(height: 12),
 
-                    // =================================================
-                    // AI ENHANCEMENT
-                    // =================================================
-                    _aiEnhancementCard(),
+                    _aiEnhancement(),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                    // =================================================
-                    // PRODUCT NAME
-                    // =================================================
-                    _productNameCard(),
+                    _productName(),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                    // =================================================
-                    // DESCRIPTION
-                    // =================================================
-                    _descriptionCard(),
+                    _description(),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                    // =================================================
-                    // OPTIONAL PRICE SECTION
-                    // =================================================
-                    _priceCard(),
+                    _colorOptions(),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
+
+                    _suggestedPrice(),
                   ],
                 ),
               ),
             ),
 
-            // =========================================================
-            // BOTTOM BUTTONS
-            // =========================================================
             _bottomButtons(),
           ],
         ),
@@ -121,50 +89,83 @@ class _ReviewEditListingScreenState
     );
   }
 
-  // =================================================================
-  // BACK BUTTON
-  // =================================================================
+  // ------------------------------------------------------------
+  // HEADER
+  // ------------------------------------------------------------
 
-  Widget _backButton() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pop(context);
-      },
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFCF6),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFD2B48C),
-            width: 1,
+  Widget _header() {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderBrown),
+            ),
+            child: const Icon(
+              Icons.arrow_back,
+              color: darkBrown,
+              size: 19,
+            ),
           ),
         ),
-        child: const Icon(
-          Icons.arrow_back,
-          size: 19,
-          color: Color(0xFF5C4033),
+
+        const SizedBox(width: 14),
+
+        const Expanded(
+          child: Text(
+            'Review & Edit Listing',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: darkBrown,
+            ),
+          ),
         ),
-      ),
+
+        const Text(
+          '✏️',
+          style: TextStyle(fontSize: 18),
+        ),
+      ],
     );
   }
 
-  // =================================================================
+  // ------------------------------------------------------------
   // PRODUCT IMAGE
-  // =================================================================
+  // ------------------------------------------------------------
 
-  Widget _productImageCard() {
+  Widget _productImage() {
     return Container(
       width: double.infinity,
-      height: 208,
+      height: 190,
       decoration: BoxDecoration(
         color: const Color(0xFFC77B4A),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // AI Enhanced badge
+          if (widget.imagePath != null &&
+              widget.imagePath!.isNotEmpty)
+            Positioned.fill(
+              child: Image.file(
+                File(widget.imagePath!),
+                fit: BoxFit.cover,
+              ),
+            )
+          else
+            const Center(
+              child: Text(
+                '🏺',
+                style: TextStyle(fontSize: 60),
+              ),
+            ),
+
           Positioned(
             top: 12,
             left: 12,
@@ -174,33 +175,15 @@ class _ReviewEditListingScreenState
                 vertical: 6,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF8B5E34),
-                borderRadius: BorderRadius.circular(8),
+                color: brown,
+                borderRadius: BorderRadius.circular(9),
               ),
               child: const Text(
                 '✨ AI Enhanced',
                 style: TextStyle(
+                  color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-
-          // Placeholder product image
-          Center(
-            child: Container(
-              width: 80,
-              height: 110,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD8945E),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: const Center(
-                child: Text(
-                  '🏺',
-                  style: TextStyle(fontSize: 48),
                 ),
               ),
             ),
@@ -210,25 +193,20 @@ class _ReviewEditListingScreenState
     );
   }
 
-  // =================================================================
-  // AI ENHANCEMENT CARD
-  // =================================================================
+  // ------------------------------------------------------------
+  // AI ENHANCEMENT
+  // ------------------------------------------------------------
 
-  Widget _aiEnhancementCard() {
+  Widget _aiEnhancement() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        12,
-        12,
-        12,
-        12,
-      ),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFD2B48C),
-          width: 0.8,
+          color: borderBrown,
+          width: .8,
         ),
       ),
       child: Column(
@@ -237,36 +215,21 @@ class _ReviewEditListingScreenState
           const Text(
             'AI Enhancement',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF8B5E34),
+              color: brown,
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 9),
 
           Row(
             children: [
-              Expanded(
-                child: _enhancementItem(
-                  '✨',
-                  'Background\ncleaned',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _enhancementItem(
-                  '✨',
-                  'Lighting\nimproved',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _enhancementItem(
-                  '✨',
-                  'Product\ncentered',
-                ),
-              ),
+              _enhancement('✨', 'Background\ncleaned'),
+              const SizedBox(width: 7),
+              _enhancement('✨', 'Lighting\nimproved'),
+              const SizedBox(width: 7),
+              _enhancement('✨', 'Product\ncentered'),
             ],
           ),
         ],
@@ -274,287 +237,338 @@ class _ReviewEditListingScreenState
     );
   }
 
-  Widget _enhancementItem(
-    String icon,
-    String text,
-  ) {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 5,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F3EF),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Center(
-        child: Text(
-          '$icon $text',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            height: 1.2,
-            color: Color(0xFF387D69),
-            fontWeight: FontWeight.w500,
+  Widget _enhancement(String icon, String text) {
+    return Expanded(
+      child: Container(
+        height: 58,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F3EF),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Center(
+          child: Text(
+            '$icon $text',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              height: 1.2,
+              color: Color(0xFF387D69),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // =================================================================
-  // PRODUCT NAME CARD
-  // =================================================================
+  // ------------------------------------------------------------
+  // PRODUCT NAME
+  // ------------------------------------------------------------
 
-  Widget _productNameCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFD2B48C),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+  Widget _productName() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'PRODUCT NAME',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF9A8979),
-                  ),
-                ),
+          const Text(
+            'PRODUCT NAME',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF9A8979),
+            ),
+          ),
 
-                const SizedBox(height: 6),
+          const SizedBox(height: 5),
 
-                TextField(
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
                   controller: productNameController,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF5C4033),
-                    fontFamily: 'Playfair Display',
-                  ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
-                ),
-
-                const SizedBox(height: 6),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF2FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    '✨ AI Generated',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF5485C4),
-                    ),
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: darkBrown,
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Edit button
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0E2CC),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text(
-                '✏️',
-                style: TextStyle(fontSize: 17),
               ),
-            ),
+
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0E2CC),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(
+                  Icons.edit,
+                  size: 16,
+                  color: brown,
+                ),
+              ),
+            ],
           ),
+
+          const SizedBox(height: 5),
+
+          _tag('✨ AI Generated'),
         ],
       ),
     );
   }
 
-  // =================================================================
-  // DESCRIPTION CARD
-  // =================================================================
+  // ------------------------------------------------------------
+  // DESCRIPTION
+  // ------------------------------------------------------------
 
-  Widget _descriptionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFD2B48C),
-          width: 0.8,
-        ),
-      ),
+  Widget _description() {
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Description heading + language buttons
           Row(
             children: [
               const Expanded(
                 child: Text(
                   'DESCRIPTION',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF9A8979),
                   ),
                 ),
               ),
 
-              // English
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 7,
+              _languageChip('English', true),
+
+              const SizedBox(width: 5),
+
+              _languageChip('हिंदी', false),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          TextField(
+            controller: descriptionController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: Color(0xFF6B5143),
+            ),
+          ),
+
+          _tag('✨ AI Suggested'),
+        ],
+      ),
+    );
+  }
+
+  Widget _languageChip(String text, bool selected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: selected ? brown : const Color(0xFFF0E2CC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : darkBrown,
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------
+  // COLOR OPTIONS
+  // ------------------------------------------------------------
+
+  Widget _colorOptions() {
+    const colors = ['Black', 'Blue', 'Brown'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Color options Available',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: darkBrown,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Row(
+          children: colors.map((color) {
+            final selected = selectedColor == color;
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    selectedColor = color;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFF0E2CC)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? brown : borderBrown,
+                    ),
+                  ),
+                  child: Text(
+                    color,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? brown : darkBrown,
+                    ),
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B5E34),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Text(
-                  'English',
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------
+  // SUGGESTED PRICE
+  // ------------------------------------------------------------
+
+  Widget _suggestedPrice() {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'SUGGESTED PRICE',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: Color(0xFF9A8979),
                   ),
                 ),
               ),
 
-              const SizedBox(width: 6),
-
-              // Hindi
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
+                  horizontal: 8,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0E2CC),
-                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFFE8F3EF),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  'हिंदी',
+                  'AI Confidence: High',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF5C4033),
+                    fontSize: 9,
+                    color: Color(0xFF387D69),
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 9),
 
-          TextField(
-            controller: descriptionController,
-            maxLines: 5,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: Color(0xFF6B5143),
+          Container(
+            height: 45,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderBrown),
             ),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // =================================================================
-  // PRICE CARD
-  // =================================================================
-
-  Widget _priceCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFD2B48C),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: const Row(
               children: [
                 Text(
-                  'PRICE',
+                  '₹',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF9A8979),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: darkBrown,
                   ),
                 ),
-                SizedBox(height: 5),
+                SizedBox(width: 10),
                 Text(
-                  '₹800 – ₹1,200',
+                  '1000',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF8B5E34),
+                    fontSize: 16,
+                    color: darkBrown,
                   ),
+                ),
+                Spacer(),
+                Icon(
+                  Icons.edit,
+                  size: 16,
+                  color: brown,
                 ),
               ],
             ),
           ),
 
+          const SizedBox(height: 7),
+
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 7,
-            ),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF0E2CC),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: const Text(
-              'Edit',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF8B5E34),
-              ),
+            child: const Row(
+              children: [
+                Text(
+                  '₹ 1200',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: brown,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  'Recommended',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -562,34 +576,67 @@ class _ReviewEditListingScreenState
     );
   }
 
-  // =================================================================
+  // ------------------------------------------------------------
+  // COMMON CARD
+  // ------------------------------------------------------------
+
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: borderBrown,
+          width: .8,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _tag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF2FF),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 9,
+          color: Color(0xFF5485C4),
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------
   // BOTTOM BUTTONS
-  // =================================================================
+  // ------------------------------------------------------------
 
   Widget _bottomButtons() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        12,
-        24,
-        16,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF9EF),
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
+      decoration: const BoxDecoration(
+        color: background,
         border: Border(
           top: BorderSide(
-            color: const Color(0xFFD2B48C),
-            width: 0.5,
+            color: borderBrown,
+            width: .5,
           ),
         ),
       ),
       child: Row(
         children: [
-          // SAVE DRAFT
           Expanded(
             child: SizedBox(
-              height: 63,
+              height: 54,
               child: OutlinedButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -599,21 +646,16 @@ class _ReviewEditListingScreenState
                   );
                 },
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(
-                    color: Color(0xFF8B5E34),
-                    width: 1.5,
-                  ),
+                  side: const BorderSide(color: brown),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  backgroundColor: const Color(0xFFFFF9EF),
                 ),
                 child: const Text(
                   'Save Draft',
                   style: TextStyle(
-                    fontSize: 16,
+                    color: brown,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF8B5E34),
                   ),
                 ),
               ),
@@ -622,20 +664,24 @@ class _ReviewEditListingScreenState
 
           const SizedBox(width: 10),
 
-          // PUBLISH
           Expanded(
             child: SizedBox(
-              height: 63,
+              height: 54,
               child: ElevatedButton(
                 onPressed: () {
-                  _publishProduct();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Product published successfully!',
+                      ),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B5E34),
-                  foregroundColor: Colors.white,
+                  backgroundColor: brown,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(15),
                   ),
                 ),
                 child: const Row(
@@ -644,14 +690,14 @@ class _ReviewEditListingScreenState
                     Text(
                       'Publish',
                       style: TextStyle(
-                        fontSize: 16,
+                        color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: 7),
                     Text(
                       '🚀',
-                      style: TextStyle(fontSize: 19),
+                      style: TextStyle(fontSize: 17),
                     ),
                   ],
                 ),
@@ -659,18 +705,6 @@ class _ReviewEditListingScreenState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // =================================================================
-  // PUBLISH ACTION
-  // =================================================================
-
-  void _publishProduct() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Product published successfully!'),
       ),
     );
   }

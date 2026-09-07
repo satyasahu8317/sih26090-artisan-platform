@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'role_selection_screen.dart';
-
+import 'package:go_router/go_router.dart';
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key});
 
@@ -104,14 +103,9 @@ class _LanguageScreenState extends State<LanguageScreen> {
                     height: 60,
 
                     child:ElevatedButton(
-  onPressed: () {
-    Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => const RoleSelectionScreen(),
-  ),
-);
-  },
+onPressed: () {
+  context.go('/role');
+},
 
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF8B5E34),
