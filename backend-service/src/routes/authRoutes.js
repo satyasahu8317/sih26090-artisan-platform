@@ -1,6 +1,15 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { requestOtp, verifyOtp, verifyMsg91, register, getMe } from '../controllers/authController.js';
+import {
+  requestOtp,
+  verifyOtp,
+  verifyMsg91,
+  register,
+  getMe,
+  sendMsg91Otp,
+  verifyMsg91Otp,
+  retryMsg91Otp,
+} from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -14,6 +23,9 @@ const otpLimiter = rateLimit({
 router.post('/mobile', otpLimiter, requestOtp);
 router.post('/verify-otp', verifyOtp);
 router.post('/msg91/verify', verifyMsg91);
+router.post('/msg91/send-otp', otpLimiter, sendMsg91Otp);
+router.post('/msg91/verify-otp', verifyMsg91Otp);
+router.post('/msg91/retry-otp', retryMsg91Otp);
 router.post('/register/:role', protect, register);
 router.get('/me', protect, getMe);
 
