@@ -1,28 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MyCatalogScreen extends StatefulWidget {
+import '../data/product_model.dart';
+import '../providers/products_provider.dart';
+
+class MyCatalogScreen extends ConsumerStatefulWidget {
   const MyCatalogScreen({super.key});
 
   @override
-  State<MyCatalogScreen> createState() => _MyCatalogScreenState();
+  ConsumerState<MyCatalogScreen> createState() => _MyCatalogScreenState();
 }
 
-class _MyCatalogScreenState extends State<MyCatalogScreen> {
+class _MyCatalogScreenState extends ConsumerState<MyCatalogScreen> {
   String filter = 'All';
-
-  final products = const [
-    ['Blue Pottery Vase', '₹800–₹1,200', 'Published', '4,650', '7'],
-    ['Clay Pot', '₹500–₹900', 'Pending', '', ''],
-    ['Decorative Plate', '₹700–₹1,200', 'Published', '2,340', '3'],
-    ['Woven Bag', '₹400–₹600', 'Draft', '', ''],
-    ['Bangle Set', '₹300–₹500', 'Published', '1,120', '5'],
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final shown = filter == 'All'
-        ? products
-        : products.where((p) => p[2] == filter).toList();
+    final productsAsync = ref.watch(myProductsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F0E4),
@@ -31,8 +25,24 @@ class _MyCatalogScreenState extends State<MyCatalogScreen> {
         child: Column(
           children: [
             Expanded(
-              child: CustomScrollView(
-                slivers: [
+              child: productsAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF8B5E34),
+                  ),
+                ),
+                error: (error, _) => _ErrorState(
+                  onRetry: () => ref.invalidate(myProductsProvider),
+                ),
+                data: (products) {
+                  final shown = filter == 'All'
+                      ? products
+                      : products
+                          .where((product) => product.displayStatus == filter)
+                          .toList();
+
+                  return CustomScrollView(
+                    slivers: [
                   // ---------------- HEADER ----------------
                   SliverToBoxAdapter(
                     child: const Padding(
@@ -117,7 +127,7 @@ class _MyCatalogScreenState extends State<MyCatalogScreen> {
                   ),
 
                   // ---------------- PRODUCT LIST ----------------
-                  SliverPadding(
+                      SliverPadding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                     sliver: SliverList.builder(
                       itemCount: shown.length,
@@ -128,11 +138,12 @@ class _MyCatalogScreenState extends State<MyCatalogScreen> {
                             data: shown[i],
                           ),
                         );
-                      },
+                 } ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                );
+              },
+            ),
             ),
 
             // ---------------- BOTTOM NAV ----------------
@@ -168,7 +179,7 @@ class _MyCatalogScreenState extends State<MyCatalogScreen> {
 // ============================================================
 
 class _ProductCard extends StatelessWidget {
-  final List<String> data;
+  final Product data;
 
   const _ProductCard({
     required this.data,
@@ -176,7 +187,7 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = data[2];
+    final status = data.displayStatus;
 
     final bg = status == 'Published'
         ? const Color(0xFFE4F2EA)
@@ -211,11 +222,21 @@ class _ProductCard extends StatelessWidget {
           Container(
             width: 132,
             color: const Color(0xFFC77B4C),
-            child: const Icon(
-              Icons.local_florist_outlined,
-              size: 38,
-              color: Color(0x99FFFFFF),
-            ),
+            child: data.imageUrl == null
+                ? const Icon(
+                    Icons.local_florist_outlined,
+                    size: 38,
+                    color: Color(0x99FFFFFF),
+                  )
+                : Image.network(
+                    data.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.local_florist_outlined,
+                      size: 38,
+                      color: Color(0x99FFFFFF),
+                    ),
+                  ),
           ),
 
           // -------- PRODUCT INFO --------
@@ -240,7 +261,7 @@ class _ProductCard extends StatelessWidget {
 
                       Expanded(
                         child: Text(
-                          data[0],
+                          data.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
 
@@ -283,7 +304,9 @@ class _ProductCard extends StatelessWidget {
 
                   // PRICE
                   Text(
-                    data[1],
+                    data.material == null || data.material!.isEmpty
+                      ? data.category
+                      : '${data.category} • ${data.material}',
                     style: const TextStyle(
                       color: Color(0xFF8B5E34),
                       fontSize: 12,
@@ -293,46 +316,6 @@ class _ProductCard extends StatelessWidget {
 
                   const Spacer(),
 
-                  // VIEWS + ENQUIRIES
-                  if (data[3].isNotEmpty)
-                    Row(
-                      children: [
-
-                        const Icon(
-                          Icons.visibility_rounded,
-                          size: 13,
-                          color: Color(0xFF84766B),
-                        ),
-
-                        const SizedBox(width: 4),
-
-                        Text(
-                          data[3],
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: Color(0xFF9A8B7E),
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        const Icon(
-                          Icons.chat_bubble_rounded,
-                          size: 12,
-                          color: Color(0xFF84766B),
-                        ),
-
-                        const SizedBox(width: 4),
-
-                        Text(
-                          data[4],
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: Color(0xFF9A8B7E),
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
               ),
             ),
@@ -456,6 +439,35 @@ class _Nav extends StatelessWidget {
                   ? const Color(0xFF6A4935)
                   : const Color(0xFF9A7C60),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Unable to load products',
+            style: TextStyle(
+              color: Color(0xFF6A4A38),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Retry'),
           ),
         ],
       ),

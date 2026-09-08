@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-class LanguageScreen extends StatefulWidget {
+
+import '../../../core/localization/locale_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
+
+class LanguageScreen extends ConsumerStatefulWidget {
   const LanguageScreen({super.key});
 
   @override
-  State<LanguageScreen> createState() => _LanguageScreenState();
+  ConsumerState<LanguageScreen> createState() => _LanguageScreenState();
 }
 
-class _LanguageScreenState extends State<LanguageScreen> {
-  String selectedLanguage = 'हिंदी';
+class _LanguageScreenState extends ConsumerState<LanguageScreen> {
+  String selectedLanguage = 'English';
 
   final List<String> languages = [
     'हिंदी',
@@ -22,6 +27,9 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final activeLanguage = _languageName(ref.watch(localeProvider).languageCode);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
 
@@ -40,8 +48,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 children: [
                   const SizedBox(height: 55),
 
-                  const Text(
-                    'Choose your\nlanguage',
+                  Text(
+                    l10n.chooseLanguage,
                     style: TextStyle(
                       fontSize: 30,
                       height: 1.15,
@@ -52,8 +60,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
                   const SizedBox(height: 10),
 
-                  const Text(
-                    'अपनी भाषा चुनें',
+                  Text(
+                    l10n.chooseLanguageNative,
                     style: TextStyle(
                       fontSize: 16,
                       color: Color(0xFF8B5E34),
@@ -84,11 +92,14 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
                         return _LanguageButton(
                           language: language,
-                          isSelected: language == selectedLanguage,
+                          isSelected: language == activeLanguage,
                           onTap: () {
                             setState(() {
                               selectedLanguage = language;
                             });
+                            ref.read(localeProvider.notifier).setLanguage(
+                                  _languageCode(language),
+                                );
                           },
                         );
                       },
@@ -117,11 +128,11 @@ onPressed: () {
                         ),
                       ),
 
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Continue',
+                            l10n.continueLabel,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -147,6 +158,44 @@ onPressed: () {
         ),
       ),
     );
+  }
+
+  String _languageCode(String language) {
+    switch (language) {
+      case 'हिंदी':
+        return 'hi';
+      case 'मराठी':
+        return 'mr';
+      case 'বাংলা':
+        return 'bn';
+      case 'ગુજરાતી':
+        return 'gu';
+      case 'தமிழ்':
+        return 'ta';
+      case 'తెలుగు':
+        return 'te';
+      default:
+        return 'en';
+    }
+  }
+
+  String _languageName(String languageCode) {
+    switch (languageCode) {
+      case 'hi':
+        return 'हिंदी';
+      case 'mr':
+        return 'मराठी';
+      case 'bn':
+        return 'বাংলা';
+      case 'gu':
+        return 'ગુજરાતી';
+      case 'ta':
+        return 'தமிழ்';
+      case 'te':
+        return 'తెలుగు';
+      default:
+        return 'English';
+    }
   }
 }
 

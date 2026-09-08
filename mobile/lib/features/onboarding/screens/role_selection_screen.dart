@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/onboarding_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -24,6 +25,7 @@ class _RoleSelectionScreenState
 
     // Riverpod se selected role ko listen kar rahe hain
     final selectedRole = ref.watch(selectedRoleProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -44,8 +46,8 @@ class _RoleSelectionScreenState
               const SizedBox(height: 18),
 
               // Heading
-              const Text(
-                'How will you use\nKalamitr ?',
+              Text(
+                l10n.roleTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Playfair Display',
@@ -59,7 +61,7 @@ class _RoleSelectionScreenState
               const SizedBox(height: 8),
 
               // Subtitle
-              const Text(
+              Text(
                 'Choose what you want to do and we’ll personalize your experience.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -82,12 +84,12 @@ class _RoleSelectionScreenState
                         imagePath:
                             'assets/images/auth/artist_side.png',
                         icon: Icons.shopping_basket_outlined,
-                        title: 'Seller / Artisan',
+                        title: l10n.artisanRole,
                         description:
                             'Sell your handmade\nproducts',
                         feature:
                             'Reach more buyers\nCreate listing with AI',
-                        buttonText: 'Continue as Seller',
+                        buttonText: '${l10n.continueLabel} ${l10n.artisanRole}',
                         color: brown,
                         isSelected: selectedRole == 'seller',
 
@@ -107,12 +109,12 @@ class _RoleSelectionScreenState
                         imagePath:
                             'assets/images/auth/buyer_side.png',
                         icon: Icons.shopping_bag_outlined,
-                        title: 'Buyer',
+                        title: l10n.buyerRole,
                         description:
                             'Discover handmade\nproducts',
                         feature:
                             'Explore artisans\nbuy authentic crafts',
-                        buttonText: 'Continue as Buyer',
+                        buttonText: '${l10n.continueLabel} ${l10n.buyerRole}',
                         color: green,
                         isSelected: selectedRole == 'buyer',
 
@@ -149,8 +151,8 @@ class _RoleSelectionScreenState
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  child: const Text(
-                    'Continue  →',
+                  child: Text(
+                    '${l10n.continueLabel}  →',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

@@ -1,7 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../auth/data/auth_repository.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,27 +12,44 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
 
-    _timer = Timer(const Duration(seconds: 2), () {
-      if (mounted) {
+    _startSessionCheck();
+  }
+
+  Future<void> _startSessionCheck() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
+    try {
+      final session = await AuthRepository.verifyStoredSession();
+      if (!mounted) return;
+
+      if (session == null) {
         context.go('/language');
+      } else if (session.role == 'ARTISAN') {
+        context.go('/home');
+      } else {
+        context.go('/buyer-home');
       }
-    });
+    } on AuthSessionException {
+      if (mounted) context.go('/login');
+    } on AuthException {
+      if (mounted) context.go('/language');
+    }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
       body: SafeArea(
@@ -62,8 +80,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   color: const Color(0xFFD2B48C),
                 ),
               ),
-              child: const Text(
-                'AI-Powered Craft Marketplace',
+              child: Text(
+                l10n.splashTagline,
                 style: TextStyle(
                   color: Color(0xFF8B5E34),
                   fontSize: 12,

@@ -1,13 +1,28 @@
 import 'dart:async';
 
+import '../data/auth_repository.dart';
+import '../data/msg91_service.dart';
+import '../utils/auth_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../onboarding/providers/onboarding_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({super.key});
+  const OtpScreen({
+    super.key,
+    required this.phone,
+    required this.reqId,
+  });
+
+  /// 10-digit mobile number entered on the login screen.
+  final String phone;
+
+  /// MSG91 `reqId` returned by `Msg91Service.sendOtp` - required to verify
+  /// or retry this OTP attempt.
+  final String reqId;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -23,10 +38,23 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   Timer? _timer;
   int _secondsRemaining = 8;
 
+  bool _isVerifying = false;
+  bool _isResending = false;
+
   @override
   void initState() {
     super.initState();
     _startTimer();
+
+    if (widget.reqId.isEmpty) {
+      // Reached this screen without a valid MSG91 request - nothing to
+      // verify against, so send the user back to re-enter their number.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showError('Your OTP session expired. Please request a new OTP.');
+        context.go('/login');
+      });
+    }
   }
 
   void _startTimer() {
@@ -61,16 +89,84 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     return _controllers.map((controller) => controller.text).join();
   }
 
- void _verifyOtp() {
-  final role = ref.read(selectedRoleProvider);
+  String get _maskedPhone {
+    final phone = widget.phone;
+    if (phone.length != 10) return phone;
+    return '${phone.substring(0, 2)}XXXXX${phone.substring(7)}';
+  }
 
-  if (role == 'seller') {
-    // Seller/Artisan onboarding
-    context.go('/profile');
-  }else if (role == 'buyer') {
-  context.go('/buyer-profile');
-}
-}
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _verifyOtp() async {
+    if (_isVerifying) return;
+
+    setState(() => _isVerifying = true);
+
+    try {
+      // 1. Verify the OTP with MSG91 and get the MSG91 accessToken.
+      //    NOTE: the raw 4-digit OTP never leaves this call - only the
+      //    resulting accessToken is sent to our backend below.
+      final msg91AccessToken = await Msg91Service.verifyOtp(
+        reqId: widget.reqId,
+        otp: _otp,
+      );
+
+      final selectedRole = ref.read(selectedRoleProvider);
+      final backendRole = mapSelectedRoleToBackendRole(selectedRole);
+
+      // 2. Exchange the MSG91 accessToken for our backend's JWT.
+      //    AuthRepository already saves the JWT via TokenStorage.
+      final authResult = await AuthRepository.verifyMsg91Token(
+        accessToken: msg91AccessToken,
+        role: backendRole,
+      );
+
+      if (!mounted) return;
+
+      // 3. Decide where to go: new users follow the role we sent; existing
+      //    users follow the backend's redirect (source of truth).
+      final route = resolvePostAuthRoute(
+        isNewUser: authResult.isNewUser,
+        selectedRole: selectedRole,
+        backendRedirect: authResult.redirect,
+      );
+
+      context.go(route);
+    } on Msg91Exception catch (e) {
+      _showError(e.message);
+    } on AuthException catch (e) {
+      _showError(e.message);
+    } catch (_) {
+      _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isVerifying = false);
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    if (_isResending || widget.reqId.isEmpty) return;
+
+    setState(() => _isResending = true);
+
+    try {
+      await Msg91Service.retryOtp(reqId: widget.reqId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP resent.')),
+      );
+      _startTimer();
+    } on Msg91Exception catch (e) {
+      _showError(e.message);
+    } catch (_) {
+      _showError('Failed to resend OTP. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isResending = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -89,6 +185,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     const backgroundColor = Color(0xFFF9F4E9);
     const brown = Color(0xFF8B5E34);
     const darkBrown = Color(0xFF5C4033);
@@ -130,11 +227,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
                   const SizedBox(width: 12),
 
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Verify Mobile Number',
+                        l10n.verifyMobileNumber,
                         style: TextStyle(
                           fontFamily: 'serif',
                           fontSize: 22,
@@ -143,7 +240,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                         ),
                       ),
                       Text(
-                        'मोबाइल नंबर सत्यापित करें',
+                        l10n.verifyMobileNumber,
                         style: TextStyle(
                           fontSize: 13,
                           color: greyBrown,
@@ -219,8 +316,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               const SizedBox(height: 28),
 
               // ---------------- TITLE ----------------
-              const Text(
-                'Enter OTP',
+              Text(
+                l10n.enterOtp,
                 style: TextStyle(
                   fontFamily: 'serif',
                   fontSize: 30,
@@ -231,8 +328,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
               const SizedBox(height: 4),
 
-              const Text(
-                '4-digit code sent to',
+              Text(
+                l10n.codeSentTo,
                 style: TextStyle(
                   fontSize: 20,
                   color: greyBrown,
@@ -245,9 +342,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    '+91 xx xx x432 10',
-                    style: TextStyle(
+                  Text(
+                    '+91 $_maskedPhone',
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                       color: brown,
@@ -265,8 +362,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       color: const Color(0xFFFFE8DF),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      'Change',
+                    child: Text(
+                      l10n.change,
                       style: TextStyle(
                         color: Color(0xFFD85C35),
                         fontSize: 14,
@@ -289,10 +386,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     ),
                   ),
 
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'OTP valid for 10 minutes',
+                      l10n.otpValid,
                       style: TextStyle(
                         fontSize: 14,
                         color: greyBrown,
@@ -367,7 +464,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _otp.length == 4
+                  onPressed: (_otp.length == 4 && !_isVerifying)
                       ? _verifyOtp
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -380,13 +477,22 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Verify OTP →',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: _isVerifying
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          '${l10n.verify} OTP →',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
 
@@ -425,8 +531,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
                   Text(
                     _secondsRemaining > 0
-                        ? 'Resend in '
-                        : 'Resend ',
+                        ? '${l10n.resendOtp} in '
+                        : '${l10n.resendOtp} ',
                     style: const TextStyle(
                       fontSize: 14,
                       color: greyBrown,
@@ -444,10 +550,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     )
                   else
                     GestureDetector(
-                      onTap: _startTimer,
-                      child: const Text(
-                        'now',
-                        style: TextStyle(
+                      onTap: _isResending ? null : _resendOtp,
+                      child: Text(
+                        _isResending ? 'Sending…' : 'now',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: brown,
                           fontWeight: FontWeight.w600,

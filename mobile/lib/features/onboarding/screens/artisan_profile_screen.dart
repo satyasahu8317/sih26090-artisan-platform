@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ArtisanProfileScreen extends StatelessWidget {
+import '../../artisan/providers/artisan_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
+
+class ArtisanProfileScreen extends ConsumerWidget {
   const ArtisanProfileScreen({super.key});
 
   static const bg = Color(0xFFF6F1E7);
@@ -9,7 +13,10 @@ class ArtisanProfileScreen extends StatelessWidget {
   static const lightBrown = Color(0xFFEDE0CC);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(artisanProfileProvider).valueOrNull;
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
@@ -28,9 +35,9 @@ class ArtisanProfileScreen extends StatelessWidget {
                         () => Navigator.pop(context),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Artisan Profile',
+                          l10n.artisanProfile,
                           style: TextStyle(
                             fontFamily: 'Playfair Display',
                             fontSize: 20,
@@ -86,8 +93,8 @@ class ArtisanProfileScreen extends StatelessWidget {
                                   children: [
                                     Row(
                                       children: [
-                                        const Text(
-                                          'Sita Devi',
+                                        Text(
+                                          profile?.name ?? 'Artisan',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w700,
@@ -96,7 +103,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 6),
                                         _badge(
-                                          '✓ Verified',
+                                          l10n.verified,
                                           const Color(0xFFE5F4EC),
                                           const Color(0xFF287A59),
                                         ),
@@ -106,22 +113,23 @@ class ArtisanProfileScreen extends StatelessWidget {
                                     Row(
                                       children: [
                                         _badge(
-                                          'Master Artisan',
+                                          l10n.masterArtisan,
                                           const Color(0xFFFFE8A8),
                                           const Color(0xFF8B5E34),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    const Text(
-                                      '📍 Jaipur, Rajasthan',
+                                    Text(
+                                      '📍 ${profile?.district ?? 'District'}, '
+                                      '${profile?.state ?? 'State'}',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Color(0xFF806F60),
                                       ),
                                     ),
-                                    const Text(
-                                      '🌐 Hindi · English · Rajasthani',
+                                    Text(
+                                      '🌐 ${profile?.preferredLanguage ?? 'Language'}',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: Color(0xFF806F60),
@@ -198,8 +206,8 @@ class ArtisanProfileScreen extends StatelessWidget {
                                     borderRadius:
                                         BorderRadius.circular(8),
                                   ),
-                                  child: const Text(
-                                    'About',
+                                  child: Text(
+                                    l10n.about,
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -211,7 +219,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                               Expanded(
                                 child: Center(
                                   child: Text(
-                                    'Products (24)',
+                                    l10n.products,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.grey.shade600,
@@ -226,7 +234,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                         const SizedBox(height: 16),
 
                         // CRAFT SPECIALTIES
-                        _sectionTitle('CRAFT SPECIALTIES'),
+                        _sectionTitle(l10n.craftSpecialties),
 
                         const SizedBox(height: 7),
 
@@ -246,7 +254,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                         const SizedBox(height: 16),
 
                         // DETAILS
-                        _sectionTitle('DETAILS'),
+                        _sectionTitle(l10n.details),
 
                         const SizedBox(height: 7),
 
@@ -272,7 +280,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                               ),
                               _detail(
                                 Icons.language,
-                                'Languages',
+                                l10n.languages,
                                 'Hindi · English · Rajasthani',
                               ),
                               const Divider(
@@ -281,7 +289,7 @@ class ArtisanProfileScreen extends StatelessWidget {
                               ),
                               _detail(
                                 Icons.shopping_bag_outlined,
-                                'Accepts custom orders',
+                                l10n.acceptsCustomOrders,
                                 'Min. qty: 5 units · Lead time: 15 days',
                               ),
                             ],

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'audio_recording_screen.dart';
 import 'ai_processing_screen.dart';
-class DescribeProductScreen extends StatefulWidget {
+import '../providers/products_provider.dart';
+import 'review_edit_listing_screen.dart';
+
+class DescribeProductScreen extends ConsumerStatefulWidget {
   const DescribeProductScreen({
     super.key,
     required this.imagePath,
@@ -11,12 +15,12 @@ class DescribeProductScreen extends StatefulWidget {
   final String imagePath;
 
   @override
-  State<DescribeProductScreen> createState() =>
+  ConsumerState<DescribeProductScreen> createState() =>
       _DescribeProductScreenState();
 }
 
 class _DescribeProductScreenState
-    extends State<DescribeProductScreen> {
+    extends ConsumerState<DescribeProductScreen> {
   static const Color backgroundColor = Color(0xFFF6F1E7);
   static const Color brownColor = Color(0xFF8B5E34);
   static const Color darkBrown = Color(0xFF604532);
@@ -58,6 +62,7 @@ class _DescribeProductScreenState
   final Set<String> selectedOrigins = {};
 
   String? audioPath;
+  bool isGenerating = false;
 
   @override
   void dispose() {
@@ -79,7 +84,45 @@ class _DescribeProductScreenState
       });
     }
   }
-void _continue() {
+  Future<void> _generateCatalogue() async {
+    final text = _descriptionController.text.trim();
+
+    setState(() {
+      isGenerating = true;
+    });
+
+    try {
+      final catalogue = await ref
+          .read(productsRepositoryProvider)
+          .generateCatalogue(text);
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReviewEditListingScreen(
+            imagePath: widget.imagePath,
+            catalogue: catalogue,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not generate the catalogue. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isGenerating = false;
+        });
+      }
+    }
+  }
+
+  void _continue() {
   if (isVoiceMode) {
     if (audioPath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,14 +147,20 @@ void _continue() {
     }
   }
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => AiProcessingScreen(
-        imagePath: widget.imagePath,
+    if (!isVoiceMode) {
+      _generateCatalogue();
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AiProcessingScreen(
+          imagePath: widget.imagePath,
+          audioPath: audioPath!,
+        ),
       ),
-    ),
-  );
+    );
 }
 
   Widget _buildModeButton({
@@ -588,7 +637,7 @@ void _continue() {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: canContinue ? _continue : null,
+                  onPressed: canContinue && !isGenerating ? _continue : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brownColor,
                     disabledBackgroundColor:
@@ -598,10 +647,19 @@ void _continue() {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: Text(
-                    isVoiceMode
-                        ? 'Record or type to continue'
-                        : 'Continue →',
+                  child: isGenerating
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          isVoiceMode
+                              ? 'Record or type to continue'
+                              : 'Continue →',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

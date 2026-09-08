@@ -1,98 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class MyOrdersScreen extends StatefulWidget {
+import '../../orders/data/artisan_order_model.dart';
+import '../../orders/providers/orders_provider.dart';
+
+class MyOrdersScreen extends ConsumerStatefulWidget {
   const MyOrdersScreen({super.key});
 
   @override
-  State<MyOrdersScreen> createState() => _MyOrdersScreenState();
+  ConsumerState<MyOrdersScreen> createState() => _MyOrdersScreenState();
 }
 
-class _MyOrdersScreenState extends State<MyOrdersScreen> {
+class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
   static const Color background = Color(0xFFF6F1E7);
   static const Color brown = Color(0xFF8B5E34);
   static const Color darkBrown = Color(0xFF604532);
   static const Color green = Color(0xFF2E7058);
-  static const Color red = Color(0xFFB52B12);
   static const Color border = Color(0xFFD2B48C);
   static const Color lightBrown = Color(0xFFEDE0CC);
 
   int selectedTab = 0;
 
-  final List<Map<String, dynamic>> activeOrders = [
-    {
-      'buyer': 'GiftWala Corp',
-      'product': 'Blue Pottery Gift Box Set',
-      'orderId': 'ORD-1041',
-      'status': 'In Production',
-      'amount': '₹1,28,800',
-      'units': '280 units',
-      'location': 'Mumbai',
-      'deadline': 'Pack by 15 Feb 2025',
-      'progress': 42,
-      'overdue': true,
-      'icon': '🎁',
-    },
-    {
-      'buyer': 'RangBazaar',
-      'product': 'Madhubani Wall Art Set',
-      'orderId': 'ORD-1038',
-      'status': 'Packing',
-      'amount': '₹72,000',
-      'units': '60 units',
-      'location': 'Delhi',
-      'deadline': 'Pack by 22 Feb 2025',
-      'progress': 85,
-      'overdue': true,
-      'icon': '🎨',
-    },
-    {
-      'buyer': 'Chokhi Dhani Resort',
-      'product': 'Terracotta Décor Set',
-      'orderId': 'ORD-1034',
-      'status': 'In Production',
-      'amount': '₹45,600',
-      'units': '120 units',
-      'location': 'Jaipur',
-      'deadline': 'Pack by 1 Mar 2025',
-      'progress': 20,
-      'overdue': true,
-      'icon': '🏺',
-    },
-  ];
-
-  final List<Map<String, dynamic>> completedOrders = [
-    {
-      'buyer': 'CraftHouse',
-      'product': 'Handmade Pottery Set',
-      'orderId': 'ORD-1028',
-      'status': 'Completed',
-      'amount': '₹36,000',
-      'units': '80 units',
-      'location': 'Delhi',
-      'deadline': 'Delivered',
-      'progress': 100,
-      'overdue': false,
-      'icon': '🏺',
-    },
-    {
-      'buyer': 'Artisan Hub',
-      'product': 'Blue Pottery Vase',
-      'orderId': 'ORD-1022',
-      'status': 'Completed',
-      'amount': '₹24,000',
-      'units': '40 units',
-      'location': 'Mumbai',
-      'deadline': 'Delivered',
-      'progress': 100,
-      'overdue': false,
-      'icon': '🎨',
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final orders = selectedTab == 0 ? activeOrders : completedOrders;
+    final status = selectedTab == 1 ? 'COMPLETED' : null;
+    final ordersAsync = ref.watch(artisanOrdersProvider(status));
 
     return Scaffold(
       backgroundColor: background,
@@ -101,30 +34,38 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                child: Column(
-                  children: [
-                    _buildStats(),
-
-                    const SizedBox(height: 14),
-
-                    _buildTabs(),
-
-                    const SizedBox(height: 12),
-
-                    if (selectedTab == 0) ...[
-                      _buildAttentionCard(),
+              child: ordersAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: brown),
+                ),
+                error: (error, stackTrace) => _ErrorState(
+                  onRetry: () => ref.invalidate(artisanOrdersProvider(status)),
+                ),
+                data: (orders) => SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                  child: Column(
+                    children: [
+                      _buildStats(orders),
+                      const SizedBox(height: 14),
+                      _buildTabs(),
                       const SizedBox(height: 12),
+                      if (orders.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: Text(
+                            'No orders found',
+                            style: TextStyle(color: Color(0xFF8B6B52)),
+                          ),
+                        )
+                      else
+                        ...orders.map(
+                          (order) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildOrderCard(order),
+                          ),
+                        ),
                     ],
-
-                    ...orders.map(
-                      (order) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildOrderCard(order),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -210,26 +151,35 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   // ───────────────── STATS ─────────────────
 
-  Widget _buildStats() {
+  Widget _buildStats(List<ArtisanOrder> orders) {
+    final requestedUnits = orders.fold<int>(
+      0,
+      (total, order) => total + order.requestedQty,
+    );
+    final totalAmount = orders.fold<double>(
+      0,
+      (total, order) => total + (order.totalAmount ?? 0),
+    );
+
     return Row(
       children: [
         Expanded(
           child: _statCard(
-            value: '3',
+            value: '${orders.length}',
             label: 'Orders\nActive',
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _statCard(
-            value: '468',
+            value: '$requestedUnits',
             label: 'Units\nPending',
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _statCard(
-            value: '₹2,46,400',
+            value: _formatAmount(totalAmount),
             label: 'Expected\nEarnings',
             smallValue: true,
           ),
@@ -290,7 +240,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         children: [
           Expanded(
             child: _tabButton(
-              title: 'Active (3)',
+              title: 'Active',
               selected: selectedTab == 0,
               onTap: () {
                 setState(() {
@@ -301,7 +251,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           ),
           Expanded(
             child: _tabButton(
-              title: 'Completed (2)',
+              title: 'Completed',
               selected: selectedTab == 1,
               onTap: () {
                 setState(() {
@@ -340,68 +290,21 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     );
   }
 
-  // ───────────────── ATTENTION ─────────────────
-
-  Widget _buildAttentionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 11,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF0DD),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFE6C59C),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE1B8),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(
-              Icons.notifications_active_outlined,
-              color: Color(0xFFB06A18),
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              '1 order needs attention',
-              style: TextStyle(
-                color: darkBrown,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right,
-            color: brown,
-            size: 20,
-          ),
-        ],
-      ),
-    );
-  }
-
   // ───────────────── ORDER CARD ─────────────────
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final int progress = order['progress'] as int;
-    final bool overdue = order['overdue'] as bool;
-    final bool completed = order['status'] == 'Completed';
+  Widget _buildOrderCard(ArtisanOrder order) {
+    final bool completed = order.status == 'COMPLETED';
 
     return GestureDetector(
       onTap: () {
-        context.push('/order-track');
+        context.push(
+          '/order-track',
+          extra: {
+            'orderId': order.id,
+            'status': order.status,
+            'requestedQty': order.requestedQty,
+          },
+        );
       },
       child: Container(
         width: double.infinity,
@@ -424,9 +327,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     color: lightBrown,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    order['icon'],
-                    style: const TextStyle(fontSize: 21),
+                  child: Icon(
+                    Icons.inventory_2_outlined,
+                    color: brown,
+                    size: 22,
                   ),
                 ),
 
@@ -440,7 +344,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              order['buyer'],
+                              order.buyer.businessName,
                               style: const TextStyle(
                                 color: darkBrown,
                                 fontSize: 12,
@@ -448,32 +352,13 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                               ),
                             ),
                           ),
-                          if (overdue)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFE1DB),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'URGENT',
-                                style: TextStyle(
-                                  color: red,
-                                  fontSize: 7,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
 
                       const SizedBox(height: 3),
 
                       Text(
-                        order['orderId'],
+                        order.id,
                         style: const TextStyle(
                           color: Color(0xFF9A8575),
                           fontSize: 8,
@@ -485,7 +370,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                       Row(
                         children: [
                           Text(
-                            order['status'],
+                            order.status,
                             style: TextStyle(
                               color: completed ? green : brown,
                               fontSize: 9,
@@ -519,7 +404,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                order['product'],
+                order.product?.displayName ?? 'Order product',
                 style: const TextStyle(
                   color: darkBrown,
                   fontSize: 11,
@@ -535,13 +420,13 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                 Expanded(
                   child: _orderInfo(
                     Icons.inventory_2_outlined,
-                    order['units'],
+                    '${order.requestedQty} units',
                   ),
                 ),
                 Expanded(
                   child: _orderInfo(
                     Icons.currency_rupee,
-                    order['amount'],
+                    _formatAmount(order.totalAmount),
                   ),
                 ),
               ],
@@ -549,60 +434,14 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
             const SizedBox(height: 9),
 
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 13,
-                  color: Color(0xFF9A8575),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  order['location'],
-                  style: const TextStyle(
-                    color: Color(0xFF9A8575),
-                    fontSize: 9,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  order['deadline'],
-                  style: TextStyle(
-                    color: overdue ? red : green,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 2),
 
-            const SizedBox(height: 9),
-
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: LinearProgressIndicator(
-                      value: progress / 100,
-                      minHeight: 5,
-                      backgroundColor: const Color(0xFFE8E0D6),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        completed ? green : brown,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$progress%',
-                  style: TextStyle(
-                    color: completed ? green : brown,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            Text(
+              order.buyer.name,
+              style: const TextStyle(
+                color: Color(0xFF9A8575),
+                fontSize: 9,
+              ),
             ),
           ],
         ),
@@ -629,6 +468,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         ),
       ],
     );
+  }
+
+  String _formatAmount(double? amount) {
+    if (amount == null) return 'Not specified';
+    return '₹${amount.toStringAsFixed(amount == amount.roundToDouble() ? 0 : 2)}';
   }
 
   // ───────────────── BOTTOM NAV ─────────────────
@@ -723,6 +567,35 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Unable to load orders',
+            style: TextStyle(
+              color: Color(0xFF604532),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }

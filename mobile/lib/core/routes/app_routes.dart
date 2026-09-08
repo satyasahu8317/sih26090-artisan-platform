@@ -30,6 +30,7 @@ import '../../features/products/screens/my_catalog_screen.dart';
 import '../../features/products/screens/review_edit_listing_screen.dart';
 import '../../features/products/screens/submit_quote_screen.dart';
 import '../../features/products/screens/my_orders_screen.dart';
+import '../../features/enquiries/screens/artisan_enquiries_screen.dart';
 import '../../features/products/screens/requirement_detail_screen.dart';
 import '../../features/buyer/screens/buyer_onboarding_profile_screen.dart';
 final GoRouter appRouter = GoRouter(
@@ -63,7 +64,15 @@ final GoRouter appRouter = GoRouter(
     // OTP
     GoRoute(
       path: '/otp',
-      builder: (context, state) => const OtpScreen(),
+      builder: (context, state) {
+        final extra = state.extra;
+        final data = extra is Map ? extra : const <String, dynamic>{};
+
+        return OtpScreen(
+          phone: (data['phone'] as String?) ?? '',
+          reqId: (data['reqId'] as String?) ?? '',
+        );
+      },
     ),
 
     // Seller Home
@@ -144,6 +153,11 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const MyOrdersScreen(),
     ),
 
+    GoRoute(
+      path: '/artisan-enquiries',
+      builder: (context, state) => const ArtisanEnquiriesScreen(),
+    ),
+
     // Notifications
     GoRoute(
       path: '/notifications',
@@ -153,7 +167,15 @@ final GoRouter appRouter = GoRouter(
     // Order Track
     GoRoute(
       path: '/order-track',
-      builder: (context, state) => const OrderTrackScreen(),
+      builder: (context, state) {
+        final extra = state.extra;
+        final data = extra is Map ? extra : const <String, dynamic>{};
+        return OrderTrackScreen(
+          orderId: data['orderId'] as String?,
+          initialStatus: data['status'] as String?,
+          requestedQty: data['requestedQty'] as int?,
+        );
+      },
     ),
     GoRoute(
   path: '/buyer-profile',

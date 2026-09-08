@@ -1,22 +1,34 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ReviewEditListingScreen extends StatefulWidget {
+import '../data/product_model.dart';
+import '../providers/products_provider.dart';
+
+class ReviewEditListingScreen extends ConsumerStatefulWidget {
   final String? imagePath;
+  final String? productId;
+  final CatalogueDraft? catalogue;
+  final String? initialProductName;
+  final String? initialDescription;
 
   const ReviewEditListingScreen({
     super.key,
     this.imagePath,
+    this.productId,
+    this.catalogue,
+    this.initialProductName,
+    this.initialDescription,
   });
 
   @override
-  State<ReviewEditListingScreen> createState() =>
+  ConsumerState<ReviewEditListingScreen> createState() =>
       _ReviewEditListingScreenState();
 }
 
 class _ReviewEditListingScreenState
-    extends State<ReviewEditListingScreen> {
+    extends ConsumerState<ReviewEditListingScreen> {
   static const background = Color(0xFFF6F1E7);
   static const brown = Color(0xFF8B5E34);
   static const darkBrown = Color(0xFF604532);
@@ -31,12 +43,148 @@ class _ReviewEditListingScreenState
   );
 
   String selectedColor = 'Blue';
+  bool isSaving = false;
+  bool isUpdatingStatus = false;
+  String? savedProductId;
+  String productStatus = 'DRAFT';
 
   @override
   void dispose() {
     productNameController.dispose();
     descriptionController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final catalogue = widget.catalogue;
+    if (catalogue != null) {
+      productNameController.text = catalogue.englishProductName;
+      descriptionController.text = catalogue.englishDescription;
+    } else {
+      if (widget.initialProductName != null) {
+        productNameController.text = widget.initialProductName!;
+      }
+      if (widget.initialDescription != null) {
+        descriptionController.text = widget.initialDescription!;
+      }
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final productName = productNameController.text.trim();
+    final description = descriptionController.text.trim();
+
+    if (productName.isEmpty || description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product name and description are required.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isSaving = true;
+    });
+
+    try {
+      final repository = ref.read(productsRepositoryProvider);
+      final product = widget.productId == null
+          ? await repository.createProduct(
+              productName: productName,
+              description: description,
+              category: 'Pottery',
+            )
+          : await repository.updateProduct(
+              productId: widget.productId!,
+              productName: productName,
+              description: description,
+            );
+
+      setState(() {
+        savedProductId = product.id;
+        productStatus = product.status;
+      });
+      ref.invalidate(myProductsProvider);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.productId == null
+                ? 'Draft created (${product.status}). You can publish it now.'
+                : 'Product updated successfully.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save the product. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _togglePublish() async {
+    final productId = savedProductId ?? widget.productId;
+    if (productId == null || productId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Save the draft before publishing it.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isUpdatingStatus = true;
+    });
+
+    try {
+      final repository = ref.read(productsRepositoryProvider);
+      final product = productStatus == 'PUBLISHED'
+          ? await repository.unpublishProduct(productId)
+          : await repository.publishProduct(productId);
+
+      setState(() {
+        productStatus = product.status;
+      });
+      ref.invalidate(myProductsProvider);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            product.status == 'PUBLISHED'
+                ? 'Product published successfully.'
+                : 'Product unpublished successfully.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update the product status. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUpdatingStatus = false;
+        });
+      }
+    }
   }
 
   @override
@@ -638,26 +786,29 @@ class _ReviewEditListingScreenState
             child: SizedBox(
               height: 54,
               child: OutlinedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Draft saved'),
-                    ),
-                  );
-                },
+                onPressed: isSaving || isUpdatingStatus ? null : _saveDraft,
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: brown),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
-                child: const Text(
-                  'Save Draft',
-                  style: TextStyle(
-                    color: brown,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: brown,
+                        ),
+                      )
+                    : const Text(
+                        'Save Draft',
+                        style: TextStyle(
+                          color: brown,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -668,15 +819,7 @@ class _ReviewEditListingScreenState
             child: SizedBox(
               height: 54,
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Product published successfully!',
-                      ),
-                    ),
-                  );
-                },
+                onPressed: isSaving || isUpdatingStatus ? null : _togglePublish,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: brown,
                   elevation: 0,
@@ -684,11 +827,20 @@ class _ReviewEditListingScreenState
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
-                child: const Row(
+                child: isUpdatingStatus
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Publish',
+                      productStatus == 'PUBLISHED' ? 'Unpublish' : 'Publish',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -696,7 +848,7 @@ class _ReviewEditListingScreenState
                     ),
                     SizedBox(width: 7),
                     Text(
-                      '🚀',
+                      productStatus == 'PUBLISHED' ? '↩' : '🚀',
                       style: TextStyle(fontSize: 17),
                     ),
                   ],

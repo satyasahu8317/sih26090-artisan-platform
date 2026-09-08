@@ -1,0 +1,15 @@
+{
+  "@@locale": "gu",
+  "appTitle": "KalaMitr",
+  "chooseLanguage": "Choose your\nlanguage",
+  "chooseLanguageNative": "अपनी भाषा चुनें",
+  "continueLabel": "Continue",
+  "roleTitle": "Choose your role",
+  "artisanRole": "Artisan",
+  "buyerRole": "Buyer",
+  "retry": "Retry",
+  "loading": "Loading...",
+  "unableToLoad": "Unable to load",
+  "splashTagline": "AI-Powered Craft Marketplace",
+  "login": "Login", "mobileNumber": "Mobile Number *", "otpWillBeSent": "OTP will be sent to this number", "yourDataIsSafe": "Your data is safe\nWe never share your information.", "sendOtp": "Send OTP →", "termsAgreement": "By continuing you agree to our Terms of Service", "verifyMobileNumber": "Verify Mobile Number", "enterOtp": "Enter OTP", "codeSentTo": "4-digit code sent to", "change": "Change", "otpValid": "OTP valid for 10 minutes", "resendOtp": "Resend OTP", "verify": "Verify", "namaste": "Namaste", "shopOverview": "Your Shop Overview", "products": "Products", "pending": "Pending", "enquiries": "Enquiries", "myCatalog": "My Catalog", "ordersAndEnquiries": "Orders & Enquiries", "notifications": "Notifications", "myProfile": "My Profile", "viewEdit": "View & Edit", "artisanProfile": "Artisan Profile", "verified": "✓ Verified", "masterArtisan": "Master Artisan", "about": "About", "details": "DETAILS", "craftSpecialties": "CRAFT SPECIALTIES", "languages": "Languages", "acceptsCustomOrders": "Accepts custom orders"
+}

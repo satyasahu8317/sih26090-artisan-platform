@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../data/msg91_service.dart';
+import '../../../l10n/generated/app_localizations.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -10,14 +14,52 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
 
+  bool _isSendingOtp = false;
+
   @override
   void dispose() {
     _phoneController.dispose();
     super.dispose();
   }
 
+  Future<void> _sendOtp() async {
+    final phone = _phoneController.text.trim();
+
+    if (phone.length != 10 || int.tryParse(phone) == null) {
+      _showError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setState(() => _isSendingOtp = true);
+
+    try {
+      final result = await Msg91Service.sendOtp(phone);
+
+      if (!mounted) return;
+
+      context.go(
+        '/otp',
+        extra: {'phone': phone, 'reqId': result.reqId},
+      );
+    } on Msg91Exception catch (e) {
+      _showError(e.message);
+    } catch (_) {
+      _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isSendingOtp = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
       body: SafeArea(
@@ -67,11 +109,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   // Login heading
-                  const Positioned(
+                  Positioned(
                     left: 40,
                     bottom: 43,
                     child: Text(
-                      'Login',
+                      l10n.login,
                       style: TextStyle(
                         fontFamily: 'Playfair Display',
                         fontSize: 41,
@@ -106,8 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SizedBox(height: 36),
 
-                    const Text(
-                      'Mobile Number *',
+                    Text(
+                      l10n.mobileNumber,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -186,8 +228,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 7),
 
-                    const Text(
-                      'OTP will be sent to this number · OTP इस नंबर पर भेजा जाएगा',
+                    Text(
+                      l10n.otpWillBeSent,
                       style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFF9D8C7D),
@@ -210,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: const Color(0xFFCFE4D9),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
@@ -221,10 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Your data is safe\n'
-                              'We never share your information. Aadhaar is '
-                              'only used for artisan verification. आपकी जानकारी '
-                              'सुरक्षित है',
+                              l10n.yourDataIsSafe,
                               style: TextStyle(
                                 fontSize: 10,
                                 height: 1.35,
@@ -243,24 +282,33 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 66,
                       child: ElevatedButton(
-                      onPressed: () {
-  context.go('/otp');
-},
+                        onPressed: _isSendingOtp ? null : _sendOtp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF996735),
+                          disabledBackgroundColor:
+                              const Color(0xFF996735).withValues(alpha: 0.6),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: const Text(
-                          'Send OTP →',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        child: _isSendingOtp
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                l10n.sendOtp,
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
 

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-class BuyerLanguagesScreen extends StatefulWidget {
+import '../../../core/localization/locale_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class BuyerLanguagesScreen extends ConsumerStatefulWidget {
   const BuyerLanguagesScreen({super.key});
 
   @override
-  State<BuyerLanguagesScreen> createState() =>
+  ConsumerState<BuyerLanguagesScreen> createState() =>
       _BuyerLanguagesScreenState();
 }
 
-class _BuyerLanguagesScreenState extends State<BuyerLanguagesScreen> {
+class _BuyerLanguagesScreenState extends ConsumerState<BuyerLanguagesScreen> {
   final Set<String> selectedLanguages = {'English'};
 
   final List<Map<String, String>> languages = [
@@ -36,6 +39,20 @@ class _BuyerLanguagesScreenState extends State<BuyerLanguagesScreen> {
         selectedLanguages.add(language);
       }
     });
+
+    const languageCodes = {
+      'Hindi': 'hi',
+      'English': 'en',
+      'Marathi': 'mr',
+      'Tamil': 'ta',
+      'Telugu': 'te',
+      'Bengali': 'bn',
+      'Gujarati': 'gu',
+    };
+    final code = languageCodes[language];
+    if (code != null) {
+      ref.read(localeProvider.notifier).setLanguage(code);
+    }
   }
 
   void _continue() {

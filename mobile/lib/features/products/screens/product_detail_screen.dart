@@ -1,33 +1,150 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProductDetailScreen extends StatelessWidget {
-  final String productName;
-  final String price;
-  final String imageUrl;
-  final String description;
-  final String artisanName;
-  final String location;
-  final int views;
-  final int enquiries;
-  final int likes;
-  final bool isVerified;
+import '../data/product_model.dart';
+import 'review_edit_listing_screen.dart';
+import '../providers/products_provider.dart';
+
+class ProductDetailScreen extends ConsumerStatefulWidget {
+  final String productId;
 
   const ProductDetailScreen({
     super.key,
-    required this.productName,
-    required this.price,
-    required this.imageUrl,
-    required this.description,
-    required this.artisanName,
-    required this.location,
-    required this.views,
-    required this.enquiries,
-    required this.likes,
-    this.isVerified = true,
+    required this.productId,
   });
 
   @override
+  ConsumerState<ProductDetailScreen> createState() =>
+      _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
+  bool isUpdatingStatus = false;
+  bool isDeleting = false;
+  String? statusOverride;
+  late Product loadedProduct;
+
+  String get productName => loadedProduct.displayName;
+  String get price => loadedProduct.material ?? loadedProduct.category;
+  String get imageUrl => loadedProduct.imageUrl ?? '';
+  String get description =>
+    (loadedProduct.description['en'] ?? loadedProduct.description['hi'])
+      ?.toString() ??
+    '';
+  bool get isPublished =>
+    (statusOverride ?? loadedProduct.status) == 'PUBLISHED';
+
+  Future<void> _unpublish() async {
+    setState(() {
+      isUpdatingStatus = true;
+    });
+
+    try {
+      final product = await ref
+          .read(productsRepositoryProvider)
+          .unpublishProduct(widget.productId);
+      ref.invalidate(myProductsProvider);
+
+      if (!mounted) return;
+      setState(() {
+        statusOverride = product.status;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product unpublished successfully.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not unpublish the product. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUpdatingStatus = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    setState(() {
+      isDeleting = true;
+    });
+
+    try {
+      await ref.read(productsRepositoryProvider).deleteProduct(widget.productId);
+      ref.invalidate(myProductsProvider);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product deleted successfully.'),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete the product. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isDeleting = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final productAsync = ref.watch(productDetailsProvider(widget.productId));
+
+    return productAsync.when(
+      loading: () => const Scaffold(
+        backgroundColor: Color(0xFFF6F1E7),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF8B5E34)),
+        ),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        backgroundColor: const Color(0xFFF6F1E7),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Unable to load this product',
+                style: TextStyle(
+                  color: Color(0xFF604532),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => ref.invalidate(
+                  productDetailsProvider(widget.productId),
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (product) {
+        loadedProduct = product;
+        return _buildLoadedProduct();
+      },
+    );
+  }
+
+  Widget _buildLoadedProduct() {
     const backgroundColor = Color(0xFFF6F1E7);
     const brown = Color(0xFF6B4735);
     const primaryBrown = Color(0xFF8B5E34);
@@ -107,8 +224,17 @@ class ProductDetailScreen extends StatelessWidget {
                           right: 16,
                           child: _circleButton(
                             icon: Icons.edit,
-                            onTap: () {
-                              // Edit product action later
+                            onTap: () async {
+                              await Navigator.push<Product>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ReviewEditListingScreen(
+                                    productId: widget.productId,
+                                    initialProductName: productName,
+                                    initialDescription: description,
+                                  ),
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -126,8 +252,8 @@ class ProductDetailScreen extends StatelessWidget {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Text(
-                              'Published',
+                            child: Text(
+                              isPublished ? 'Published' : 'Draft',
                               style: TextStyle(
                                 color: green,
                                 fontSize: 12,
@@ -180,25 +306,25 @@ class ProductDetailScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: _StatCard(
-                                  icon: '👁️',
-                                  value: _formatNumber(views),
-                                  label: 'Views',
+                                  icon: '🏷️',
+                                  value: loadedProduct.category,
+                                  label: 'Category',
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _StatCard(
-                                  icon: '💬',
-                                  value: _formatNumber(enquiries),
-                                  label: 'Enquiries',
+                                  icon: '🧵',
+                                  value: loadedProduct.material ?? 'Not specified',
+                                  label: 'Material',
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _StatCard(
-                                  icon: '❤️',
-                                  value: _formatNumber(likes),
-                                  label: 'Likes',
+                                  icon: '🔖',
+                                  value: '${loadedProduct.tags.length}',
+                                  label: 'Tags',
                                 ),
                               ),
                             ],
@@ -247,7 +373,7 @@ class ProductDetailScreen extends StatelessWidget {
                           const SizedBox(height: 18),
 
                           // --------------------------------------------------
-                          // ARTISAN CARD
+                          // PRODUCT DETAILS
                           // --------------------------------------------------
                           Container(
                             width: double.infinity,
@@ -285,7 +411,7 @@ class ProductDetailScreen extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        artisanName,
+                                        loadedProduct.category,
                                         style: const TextStyle(
                                           color: brown,
                                           fontSize: 17,
@@ -302,7 +428,8 @@ class ProductDetailScreen extends StatelessWidget {
                                           const SizedBox(width: 3),
                                           Expanded(
                                             child: Text(
-                                              location,
+                                                loadedProduct.material ??
+                                                  'Material not specified',
                                               style: const TextStyle(
                                                 color: Color(0xFF9A8A78),
                                                 fontSize: 14,
@@ -315,7 +442,7 @@ class ProductDetailScreen extends StatelessWidget {
                                   ),
                                 ),
 
-                                if (isVerified)
+                                if (loadedProduct.tags.isNotEmpty)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 11,
@@ -325,9 +452,9 @@ class ProductDetailScreen extends StatelessWidget {
                                       color: const Color(0xFFE5F2ED),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: const Text(
-                                      '✓ Verified',
-                                      style: TextStyle(
+                                    child: Text(
+                                      'Tags: ${loadedProduct.tags.join(', ')}',
+                                      style: const TextStyle(
                                         color: green,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
@@ -395,7 +522,9 @@ class ProductDetailScreen extends StatelessWidget {
                     child: SizedBox(
                       height: 64,
                       child: OutlinedButton(
-                        onPressed: () {
+                        onPressed: isUpdatingStatus || isDeleting || !isPublished
+                            ? null
+                            : () {
                           _showUnpublishDialog(context);
                         },
                         style: OutlinedButton.styleFrom(
@@ -408,13 +537,61 @@ class ProductDetailScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
+                        child: isUpdatingStatus
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: orange,
+                                ),
+                              )
+                            : const Text(
                           'Unpublish',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  Expanded(
+                    child: SizedBox(
+                      height: 64,
+                      child: OutlinedButton(
+                        onPressed: isUpdatingStatus || isDeleting
+                            ? null
+                            : () => _showDeleteDialog(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFB23B32),
+                          side: const BorderSide(
+                            color: Color(0xFFB23B32),
+                            width: 1.6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: isDeleting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFB23B32),
+                                ),
+                              )
+                            : const Text(
+                                'Delete',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -453,14 +630,7 @@ class ProductDetailScreen extends StatelessWidget {
     );
   }
 
-  static String _formatNumber(int number) {
-    if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(number % 1000 == 0 ? 0 : 1)}K';
-    }
-    return number.toString();
-  }
-
-  static void _showUnpublishDialog(BuildContext context) {
+  void _showUnpublishDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) {
@@ -487,12 +657,54 @@ class ProductDetailScreen extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                // API call will come here later
+                _unpublish();
               },
               child: const Text(
                 'Unpublish',
                 style: TextStyle(
                   color: Color(0xFFB85C38),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF6F1E7),
+          title: const Text(
+            'Delete product?',
+            style: TextStyle(
+              color: Color(0xFF6B4735),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: const Text(
+            'This product will be permanently removed from your catalog.',
+            style: TextStyle(
+              color: Color(0xFF6B4735),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteProduct();
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(
+                  color: Color(0xFFB23B32),
                 ),
               ),
             ),

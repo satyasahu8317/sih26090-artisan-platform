@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import '../products/screens/add_product_screen.dart';
 import 'package:go_router/go_router.dart';
-class HomeScreen extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../artisan/data/artisan_model.dart';
+import '../artisan/providers/artisan_provider.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int selectedIndex = 0;
 
   final Color background = const Color(0xFFF6F1E7);
@@ -17,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final dashboard = ref.watch(artisanDashboardProvider).valueOrNull;
+
     return Scaffold(
       backgroundColor: background,
 
@@ -33,11 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(),
+                        _buildHeader(dashboard?.profile.name),
 
                         const SizedBox(height: 16),
 
-                        _buildShopOverview(),
+                        _buildShopOverview(dashboard?.summary),
 
                         const SizedBox(height: 16),
 _buildAIAssistant(),
@@ -76,7 +84,8 @@ _buildQuickActions(),
   // HEADER
   // =========================================================
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String? artisanName) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -85,7 +94,7 @@ _buildQuickActions(),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Namaste 🙏',
+                '${l10n.namaste} 🙏',
                 style: TextStyle(
                   fontSize: 13,
                   color: const Color(0xFF9B806B),
@@ -95,7 +104,7 @@ _buildQuickActions(),
               const SizedBox(height: 2),
 
               Text(
-                'Sita Devi 👋',
+                '${artisanName ?? 'Artisan'} 👋',
                 style: TextStyle(
                   fontSize: 26,
                   height: 1.15,
@@ -155,7 +164,8 @@ _buildQuickActions(),
   // SHOP OVERVIEW
   // =========================================================
 
-  Widget _buildShopOverview() {
+  Widget _buildShopOverview(ArtisanDashboardSummary? summary) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
@@ -166,8 +176,8 @@ _buildQuickActions(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Your Shop Overview',
+          Text(
+            l10n.shopOverview,
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFFF6E9D8),
@@ -181,8 +191,8 @@ _buildQuickActions(),
               Expanded(
                 child: _buildStatCard(
                   icon: '📦',
-                  value: '12',
-                  label: 'Products',
+                  value: '${summary?.productCount ?? 0}',
+                  label: l10n.products,
                 ),
               ),
 
@@ -191,8 +201,8 @@ _buildQuickActions(),
               Expanded(
                 child: _buildStatCard(
                   icon: '⌛',
-                  value: '2',
-                  label: 'Pending',
+                  value: '${summary?.pendingOrdersCount ?? 0}',
+                  label: l10n.pending,
                 ),
               ),
 
@@ -201,8 +211,8 @@ _buildQuickActions(),
               Expanded(
                 child: _buildStatCard(
                   icon: '💸',
-                  value: '₹12,450',
-                  label: 'Total Sales',
+                  value: '${summary?.newEnquiriesCount ?? 0}',
+                  label: l10n.enquiries,
                 ),
               ),
             ],
@@ -371,6 +381,7 @@ _buildQuickActions(),
   // =========================================================
 
   Widget _buildQuickActions() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         Row(
@@ -378,7 +389,7 @@ _buildQuickActions(),
             Expanded(
               child: _buildActionCard(
                 icon: '🏺',
-                title: 'My Catalog',
+                title: l10n.myCatalog,
                 subtitle: '12 products',
               ),
             ),
@@ -388,11 +399,11 @@ _buildQuickActions(),
             Expanded(
               child: _buildActionCard(
                 icon: '▣',
-                title: 'Orders & Enquiries',
+                title: l10n.ordersAndEnquiries,
                 subtitle: '3 new',
                 iconBackground: const Color(0xFFE8F0D6),
                 onTap: () {
-                  context.push('/my-orders');
+                  context.push('/artisan-enquiries');
                 },
               ),
             ),
@@ -406,7 +417,7 @@ _buildQuickActions(),
             Expanded(
               child: _buildActionCard(
                 icon: '🔔',
-                title: 'Notifications',
+                title: l10n.notifications,
                 subtitle: '3 New Updates',
                 iconBackground: const Color(0xFFF7E4C1),
                 onTap: () {
@@ -418,8 +429,8 @@ _buildQuickActions(),
             const SizedBox(width: 10),
 _buildActionCard(
   icon: '👤',
-  title: 'My Profile',
-  subtitle: 'View & Edit',
+  title: l10n.myProfile,
+  subtitle: l10n.viewEdit,
   iconBackground: const Color(0xFFE6EED2),
   onTap: () {
     context.push('/artisan-profile');
@@ -633,6 +644,7 @@ _buildActionCard(
   // =========================================================
 
   Widget _buildBottomNavigation() {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       height: 87,
       decoration: BoxDecoration(
@@ -653,7 +665,7 @@ _buildActionCard(
                 child: _buildNavItem(
                   index: 0,
                   icon: Icons.home_filled,
-                  label: 'Home',
+                  label: l10n.namaste,
                 ),
               ),
 
@@ -661,7 +673,7 @@ _buildActionCard(
                 child: _buildNavItem(
                   index: 1,
                   icon: Icons.menu_book_rounded,
-                  label: 'Catalog',
+                  label: l10n.myCatalog,
                 ),
               ),
 
@@ -672,7 +684,7 @@ _buildActionCard(
                 child: _buildNavItem(
                   index: 2,
                   icon: Icons.shopping_bag_rounded,
-                  label: 'Orders',
+                  label: l10n.ordersAndEnquiries,
                 ),
               ),
 
@@ -680,7 +692,7 @@ _buildActionCard(
                 child: _buildNavItem(
                   index: 3,
                   icon: Icons.person_rounded,
-                  label: 'Profile',
+                  label: l10n.myProfile,
                 ),
               ),
             ],

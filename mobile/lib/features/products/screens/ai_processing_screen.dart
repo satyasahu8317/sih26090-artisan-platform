@@ -1,21 +1,25 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AiProcessingScreen extends StatefulWidget {
+import '../providers/products_provider.dart';
+import 'review_edit_listing_screen.dart';
+
+class AiProcessingScreen extends ConsumerStatefulWidget {
   const AiProcessingScreen({
     super.key,
     required this.imagePath,
+    required this.audioPath,
   });
 
   final String imagePath;
+  final String audioPath;
 
   @override
-  State<AiProcessingScreen> createState() => _AiProcessingScreenState();
+  ConsumerState<AiProcessingScreen> createState() =>
+      _AiProcessingScreenState();
 }
 
-class _AiProcessingScreenState extends State<AiProcessingScreen> {
+class _AiProcessingScreenState extends ConsumerState<AiProcessingScreen> {
   static const Color backgroundColor = Color(0xFFF6F1E7);
   static const Color brownColor = Color(0xFF8B5E34);
   static const Color darkBrown = Color(0xFF604532);
@@ -24,7 +28,7 @@ class _AiProcessingScreenState extends State<AiProcessingScreen> {
   static const Color lightBrown = Color(0xFFEDE0CC);
 
   int currentStep = 2;
-  Timer? _timer;
+  String? errorMessage;
 
   final List<String> steps = [
     'Cleaning your photo...',
@@ -45,34 +49,37 @@ class _AiProcessingScreenState extends State<AiProcessingScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Temporary UI progress.
-    // Later this will be replaced with actual AI job status.
-  
-_timer = Timer.periodic(
-  const Duration(seconds: 2),
-  (timer) {
-    if (!mounted) return;
-
-    if (currentStep < steps.length - 1) {
-      setState(() {
-        currentStep++;
-      });
-    } else {
-      timer.cancel();
-
-      context.push(
-        '/review-edit-listing',
-        extra: widget.imagePath,
-      );
-    }
-  },
-);
+    _generateCatalogue();
   }
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+
+  Future<void> _generateCatalogue() async {
+    setState(() {
+      currentStep = 3;
+      errorMessage = null;
+    });
+
+    try {
+      final catalogue = await ref
+          .read(productsRepositoryProvider)
+          .generateCatalogueFromAudio(widget.audioPath);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReviewEditListingScreen(
+            imagePath: widget.imagePath,
+            catalogue: catalogue,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        errorMessage =
+            'Could not generate the catalogue from this recording. Please try again.';
+      });
+    }
   }
 
   double get progress {
@@ -283,6 +290,7 @@ _timer = Timer.periodic(
 
                   const SizedBox(height: 26),
 
+                  if (errorMessage == null) ...[
                   // Processing + percentage
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -365,6 +373,32 @@ _timer = Timer.periodic(
                       ],
                     ),
                   ),
+                  ] else ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: darkBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _generateCatalogue,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: brownColor,
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Try again',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
