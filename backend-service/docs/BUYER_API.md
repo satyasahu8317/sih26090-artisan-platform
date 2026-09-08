@@ -450,3 +450,49 @@
   "message": "All notifications marked as read"
 }
 ```
+
+---
+
+## Payment APIs (Razorpay Test Mode)
+
+### 19. Initiate Payment
+**Endpoint:** `POST /api/v1/orders/:id/payment`
+**Auth Required:** Yes (must be the buyer who created the order)
+**Description:** Creates a Razorpay order for an existing application order.
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "orderId": "application-order-uuid",
+    "razorpayOrderId": "order_xxx",
+    "amount": 50000,
+    "currency": "INR",
+    "keyId": "rzp_test_xxx"
+  }
+}
+```
+
+### 20. Verify Payment
+**Endpoint:** `POST /api/v1/orders/:id/payment/verify`
+**Auth Required:** Yes (must be the buyer who created the order)
+**Description:** Verifies the Razorpay payment signature after a successful checkout.
+**Request Body:**
+```json
+{
+  "razorpay_payment_id": "pay_xxx",
+  "razorpay_order_id": "order_xxx",
+  "razorpay_signature": "signature_xxx"
+}
+```
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Payment verified successfully",
+  "data": {
+    "paymentStatus": "SUCCESS",
+    "paidAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```

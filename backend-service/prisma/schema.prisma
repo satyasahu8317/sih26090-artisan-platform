@@ -13,6 +13,7 @@ model User {
   mobileNumber    String
   role            Role
   status          Status           @default(PENDING)
+  isGuest         Boolean          @default(false)
   otpHash         String?
   otpExpiresAt    DateTime?
   otpAttempts     Int              @default(0)
@@ -104,6 +105,11 @@ model Order {
   acceptedQty  Int?
   unitPrice    Float?
   requiredBy   DateTime?
+  paymentStatus PaymentStatus @default(PENDING)
+  razorpayOrderId String?     @unique
+  razorpayPaymentId String?
+  amountPaidPaise Int?
+  paidAt       DateTime?
   artisan      ArtisanProfile @relation(fields: [artisanId], references: [id])
   buyer        BuyerProfile   @relation(fields: [buyerId], references: [id])
   product      Product?       @relation(fields: [productId], references: [id])
@@ -179,4 +185,10 @@ enum EnquiryStatus {
   READ
   RESPONDED
   CLOSED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }

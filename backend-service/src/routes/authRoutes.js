@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { requestOtp, verifyOtp, verifyMsg91, register, getMe } from '../controllers/authController.js';
+import { requestOtp, verifyOtp, verifyMsg91, register, getMe, guestLogin } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,6 +11,7 @@ const otpLimiter = rateLimit({
   message: 'Too many OTP requests from this IP, please try again after 10 minutes',
 });
 
+router.post('/guest', guestLogin);
 router.post('/mobile', otpLimiter, requestOtp);
 router.post('/verify-otp', verifyOtp);
 router.post('/msg91/verify', verifyMsg91);

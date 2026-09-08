@@ -10,6 +10,7 @@ import {
   markFulfilling,
   markCompleted
 } from '../controllers/orderController.js';
+import { createPayment, verifyPayment } from '../controllers/paymentController.js';
 
 const router = express.Router();
 
@@ -24,5 +25,7 @@ router.patch('/:id/reject', rejectOrder);
 router.patch('/:id/fulfilling', markFulfilling);
 router.patch('/:id/complete', markCompleted);
 
-export default router;
+router.post('/:id/payment', createPayment);
+router.post('/:id/payment/verify', verifyPayment);
 
+export default router;

@@ -227,3 +227,47 @@ export const getPublicArtisanProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/v1/artisans/me
+ * Update the authenticated artisan's own profile.
+ */
+export const updateArtisanProfile = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'ARTISAN') {
+      res.status(403);
+      throw new Error('Only artisans can update artisan profiles');
+    }
+
+    const artisanProfile = await prisma.artisanProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!artisanProfile) {
+      res.status(404);
+      throw new Error('Artisan profile not found');
+    }
+
+    const { name, craftType, state, district, preferredLanguage } = req.body;
+    const data = {};
+    if (name !== undefined) data.name = String(name).trim();
+    if (craftType !== undefined) data.craftType = String(craftType).trim();
+    if (state !== undefined) data.state = String(state).trim();
+    if (district !== undefined) data.district = String(district).trim();
+    if (preferredLanguage !== undefined) data.preferredLanguage = String(preferredLanguage).trim();
+
+    if (Object.keys(data).length === 0) {
+      res.status(400);
+      throw new Error('No valid fields provided for update');
+    }
+
+    const updated = await prisma.artisanProfile.update({
+      where: { id: artisanProfile.id },
+      data,
+    });
+
+    res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+

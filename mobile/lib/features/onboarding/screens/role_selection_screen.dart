@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/onboarding_provider.dart';
 
 class RoleSelectionScreen extends ConsumerStatefulWidget {
@@ -18,6 +21,45 @@ class _RoleSelectionScreenState
   static const Color green = Color(0xFF2E7058);
   static const Color darkBrown = Color(0xFF5C4033);
 
+  bool _isGuestLoading = false;
+
+  void _navigateToLogin(String role) {
+    ref.read(selectedRoleProvider.notifier).state = role;
+    context.go('/login', extra: {'role': role});
+  }
+
+  Future<void> _enterGuest(String role) async {
+    setState(() {
+      _isGuestLoading = true;
+    });
+    try {
+      await ref.read(authProvider.notifier).loginAsGuest(role);
+      final isArtisan = role == 'seller' || role == 'artisan';
+      if (mounted) {
+        if (isArtisan) {
+          context.go('/artisan/register');
+        } else {
+          context.go('/buyer/register');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Guest login error: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGuestLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
 
@@ -27,20 +69,20 @@ class _RoleSelectionScreenState
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
               // Logo
               Image.asset(
                 'assets/images/mitr_logo.png',
-                height: 95,
+                height: 85,
                 fit: BoxFit.contain,
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
 
               // Heading
               const Text(
@@ -48,7 +90,7 @@ class _RoleSelectionScreenState
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Playfair Display',
-                  fontSize: 27,
+                  fontSize: 26,
                   height: 1.05,
                   fontWeight: FontWeight.w700,
                   color: darkBrown,
@@ -68,83 +110,72 @@ class _RoleSelectionScreenState
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Role cards
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // SELLER / ARTISAN
-                    Expanded(
-                      child: _RoleCard(
-                        imagePath:
-                            'assets/images/auth/artist_side.png',
-                        icon: Icons.shopping_basket_outlined,
-                        title: 'Seller / Artisan',
-                        description:
-                            'Sell your handmade\nproducts',
-                        feature:
-                            'Reach more buyers\nCreate listing with AI',
-                        buttonText: 'Continue as Seller',
-                        color: brown,
-                        isSelected: selectedRole == 'seller',
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // SELLER / ARTISAN
+                  Expanded(
+                    child: _RoleCard(
+                      imagePath:
+                          'assets/images/auth/artist_side.png',
+                      icon: Icons.shopping_basket_outlined,
+                      title: 'Seller / Artisan',
+                      description:
+                          'Sell your handmade\nproducts',
+                      feature:
+                          'Reach more buyers\nCreate listing with AI',
+                      buttonText: 'Continue as Seller',
+                      color: brown,
+                      isSelected: selectedRole == 'seller',
 
-                        onTap: () {
-                          ref
-                              .read(selectedRoleProvider.notifier)
-                              .state = 'seller';
-                        },
-                      ),
+                      onTap: () {
+                        _navigateToLogin('seller');
+                      },
                     ),
+                  ),
 
-                    const SizedBox(width: 14),
+                  const SizedBox(width: 14),
 
-                    // BUYER
-                    Expanded(
-                      child: _RoleCard(
-                        imagePath:
-                            'assets/images/auth/buyer_side.png',
-                        icon: Icons.shopping_bag_outlined,
-                        title: 'Buyer',
-                        description:
-                            'Discover handmade\nproducts',
-                        feature:
-                            'Explore artisans\nbuy authentic crafts',
-                        buttonText: 'Continue as Buyer',
-                        color: green,
-                        isSelected: selectedRole == 'buyer',
+                  // BUYER
+                  Expanded(
+                    child: _RoleCard(
+                      imagePath:
+                          'assets/images/auth/buyer_side.png',
+                      icon: Icons.shopping_bag_outlined,
+                      title: 'Buyer',
+                      description:
+                          'Discover handmade\nproducts',
+                      feature:
+                          'Explore artisans\nbuy authentic crafts',
+                      buttonText: 'Continue as Buyer',
+                      color: green,
+                      isSelected: selectedRole == 'buyer',
 
-                        onTap: () {
-                          ref
-                              .read(selectedRoleProvider.notifier)
-                              .state = 'buyer';
-                        },
-                      ),
+                      onTap: () {
+                        _navigateToLogin('buyer');
+                      },
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
               // Bottom Continue button
               SizedBox(
                 width: double.infinity,
-                height: 58,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: selectedRole == null
                       ? null
                       : () {
-                          // Navigation baad mein add karenge.
-                          debugPrint(
-                            'Selected role: $selectedRole',
-                          );
-                        },
-                  style: ElevatedButton.styleFrom(
+                          _navigateToLogin(selectedRole);
+                        },                  style: ElevatedButton.styleFrom(
                     backgroundColor: brown,
-                    disabledBackgroundColor:
-                        brown.withValues(alpha: .45),
+                    disabledBackgroundColor: brown.withValues(alpha: .45),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -161,7 +192,54 @@ class _RoleSelectionScreenState
                 ),
               ),
 
-              const SizedBox(height: 18),
+              if (AppConfig.enableGuestMode) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isGuestLoading ? null : () => _enterGuest('seller'),
+                        icon: const Icon(Icons.palette_outlined, size: 16),
+                        label: const Text(
+                          'Guest Artisan',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: brown,
+                          side: const BorderSide(color: brown, width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isGuestLoading ? null : () => _enterGuest('buyer'),
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                        label: const Text(
+                          'Guest Buyer',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: green,
+                          side: const BorderSide(color: green, width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -169,7 +247,6 @@ class _RoleSelectionScreenState
     );
   }
 }
-
 
 /// Individual Seller / Buyer card
 class _RoleCard extends StatelessWidget {
@@ -201,7 +278,6 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 317,
         decoration: BoxDecoration(
           color: const Color(0xFFF6F1E7),
           borderRadius: BorderRadius.circular(13),
@@ -215,7 +291,7 @@ class _RoleCard extends StatelessWidget {
           children: [
             // Image
             SizedBox(
-              height: 115,
+              height: 110,
               width: double.infinity,
               child: Image.asset(
                 imagePath,
@@ -224,141 +300,134 @@ class _RoleCard extends StatelessWidget {
             ),
 
             // Card content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-
-                    // Circular icon
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFD8C9AA),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 27,
-                        color: color,
-                      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+              child: Column(
+                children: [
+                  // Circular icon
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFD8C9AA),
+                      shape: BoxShape.circle,
                     ),
-
-                    const SizedBox(height: 10),
-
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'Playfair Display',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
+                    child: Icon(
+                      icon,
+                      size: 24,
+                      color: color,
                     ),
+                  ),
 
-                    const SizedBox(height: 7),
+                  const SizedBox(height: 8),
 
-                    Text(
-                      description,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.15,
-                        color: Colors.black,
-                      ),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Playfair Display',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
                     ),
+                  ),
 
-                    const Spacer(),
+                  const SizedBox(height: 6),
 
-                    // Feature box
-                    Container(
-                      width: double.infinity,
-                      height: 45,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 23,
-                            height: 23,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              size: 15,
-                              color: Colors.white,
+                  Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.15,
+                      color: Colors.black,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Feature box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            feature,
+                            textAlign: TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              height: 1.1,
+                              color: Colors.black87,
                             ),
                           ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              feature,
-                              textAlign: TextAlign.left,
-                              style: const TextStyle(
-                                fontSize: 9.5,
-                                height: 1.1,
-                                color: Colors.black87,
-                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Card button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 34,
+                    child: ElevatedButton(
+                      onPressed: onTap,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: color,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            buttonText,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 16,
                           ),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // Card button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 32,
-                      child: ElevatedButton(
-                        onPressed: onTap,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              buttonText,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.chevron_right,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],
