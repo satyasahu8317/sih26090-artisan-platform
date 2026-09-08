@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class BuyerProfileScreen extends StatelessWidget {
+import '../providers/buyer_provider.dart';
+
+class BuyerProfileScreen extends ConsumerStatefulWidget {
   const BuyerProfileScreen({super.key});
 
   @override
+  ConsumerState<BuyerProfileScreen> createState() =>
+      _BuyerProfileScreenState();
+}
+
+class _BuyerProfileScreenState
+    extends ConsumerState<BuyerProfileScreen> {
+  bool _isUpdating = false;
+
+  @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(buyerProfileProvider);
+    final enquiriesAsync = ref.watch(buyerMyEnquiriesProvider);
+    final ordersAsync = ref.watch(buyerMyOrdersProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
       body: SafeArea(
@@ -13,31 +29,73 @@ class BuyerProfileScreen extends StatelessWidget {
           children: [
             _buildHeader(context),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
-                child: Column(
-                  children: [
-                    _buildCompanyCard(),
-                    const SizedBox(height: 10),
-                    _buildBuyerType(),
-                    const SizedBox(height: 10),
-                    _buildStats(),
-                    const SizedBox(height: 10),
-                    _buildCategories(),
-                    const SizedBox(height: 10),
-                    _buildRecentEnquiries(),
-                    const SizedBox(height: 10),
-                    _buildOrderHistory(),
-                    const SizedBox(height: 12),
-                    _buildActionButtons(context),
-                  ],
+              child: profileAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
                 ),
+                error: (error, stack) => _buildError(),
+                data: (profile) {
+                  final enquiryCount =
+                      enquiriesAsync.valueOrNull?.length ?? 0;
+
+                  final orderCount =
+                      ordersAsync.valueOrNull?.length ?? 0;
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(buyerProfileProvider);
+                      ref.invalidate(
+                        buyerMyEnquiriesProvider,
+                      );
+                      ref.invalidate(
+                        buyerMyOrdersProvider,
+                      );
+                    },
+                    child: SingleChildScrollView(
+                      physics:
+                          const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        12,
+                        8,
+                        12,
+                        20,
+                      ),
+                      child: Column(
+                        children: [
+                          _buildCompanyCard(profile),
+                          const SizedBox(height: 10),
+                          _buildBuyerType(
+                            profile.businessType,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildStats(
+                            enquiryCount,
+                            orderCount,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildCategories(),
+                          const SizedBox(height: 10),
+                          _buildRecentEnquiries(
+                            enquiriesAsync,
+                          ),
+                          const SizedBox(height: 10),
+                          _buildOrderHistory(
+                            orderCount,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildActionButtons(context),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigation(context),
+      bottomNavigationBar:
+          _buildBottomNavigation(context),
     );
   }
 
@@ -68,8 +126,10 @@ class BuyerProfileScreen extends StatelessWidget {
           const SizedBox(width: 9),
           const Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   'Buyer Profile',
@@ -90,20 +150,66 @@ class BuyerProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFFD2B48C),
+          GestureDetector(
+            onTap: () {
+              context.push('/buyer-notifications');
+            },
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFD2B48C),
+                ),
+              ),
+              child: const Icon(
+                Icons.notifications_none,
+                size: 17,
+                color: Color(0xFF604532),
               ),
             ),
-            child: const Icon(
-              Icons.notifications_none,
-              size: 17,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= ERROR =================
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            size: 35,
+            color: Color(0xFFB65B3A),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Unable to load profile',
+            style: TextStyle(
+              fontSize: 10,
               color: Color(0xFF604532),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              ref.invalidate(buyerProfileProvider);
+              ref.invalidate(
+                buyerMyEnquiriesProvider,
+              );
+              ref.invalidate(
+                buyerMyOrdersProvider,
+              );
+            },
+            child: const Text(
+              'Retry',
+              style: TextStyle(fontSize: 9),
             ),
           ),
         ],
@@ -113,7 +219,33 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= COMPANY =================
 
-  Widget _buildCompanyCard() {
+  Widget _buildCompanyCard(dynamic profile) {
+    final businessName =
+        profile.businessName?.trim().isNotEmpty == true
+            ? profile.businessName!
+            : profile.name?.trim().isNotEmpty == true
+                ? profile.name!
+                : 'Buyer';
+
+    final locationParts = <String>[];
+
+    if (profile.district != null &&
+        profile.district!.trim().isNotEmpty) {
+      locationParts.add(profile.district!);
+    }
+
+    if (profile.state != null &&
+        profile.state!.trim().isNotEmpty) {
+      locationParts.add(profile.state!);
+    }
+
+    final location = locationParts.join(', ');
+
+    final businessType =
+        profile.businessType?.trim().isNotEmpty == true
+            ? profile.businessType!
+            : 'Business';
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -132,52 +264,66 @@ class BuyerProfileScreen extends StatelessWidget {
               color: const Color(0xFFE8E5DD),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'Logo',
-                style: TextStyle(
-                  fontSize: 7,
-                  color: Color(0xFF9A806A),
+                businessName.isNotEmpty
+                    ? businessName[0].toUpperCase()
+                    : 'B',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B5E34),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
-                  'GiftWala Corp',
-                  style: TextStyle(
+                  businessName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF604532),
                   ),
                 ),
-                SizedBox(height: 3),
-                Text(
-                  '📍 Mumbai, Maharashtra',
-                  style: TextStyle(
-                    fontSize: 7,
-                    color: Color(0xFF9A806A),
+                if (location.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '📍 $location',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 7,
+                      color: Color(0xFF9A806A),
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
+                ],
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.business_center_outlined,
                       size: 10,
                       color: Color(0xFF487B68),
                     ),
-                    SizedBox(width: 3),
-                    Text(
-                      'Corporate Gifting',
-                      style: TextStyle(
-                        fontSize: 7,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF487B68),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        businessType,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 7,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF487B68),
+                        ),
                       ),
                     ),
                   ],
@@ -192,9 +338,10 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= BUYER TYPE =================
 
-  Widget _buildBuyerType() {
+  Widget _buildBuyerType(String? currentType) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         const Text(
           'BUYER TYPE',
@@ -208,21 +355,61 @@ class BuyerProfileScreen extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            _typeCard('🏪', 'Retail Shop', false),
+            _typeCard(
+              '🏪',
+              'Retail Shop',
+              _isBuyerType(
+                currentType,
+                'Retail Shop',
+              ),
+            ),
             const SizedBox(width: 6),
-            _typeCard('🛍️', 'Boutique', false),
+            _typeCard(
+              '🛍️',
+              'Boutique',
+              _isBuyerType(
+                currentType,
+                'Boutique',
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
         Row(
           children: [
-            _typeCard('🎁', 'Corporate\nGifting', true),
+            _typeCard(
+              '🎁',
+              'Corporate\nGifting',
+              _isBuyerType(
+                currentType,
+                'Corporate Gifting',
+              ),
+            ),
             const SizedBox(width: 6),
-            _typeCard('🔄', 'Reseller', false),
+            _typeCard(
+              '🔄',
+              'Reseller',
+              _isBuyerType(
+                currentType,
+                'Reseller',
+              ),
+            ),
           ],
         ),
       ],
     );
+  }
+
+  bool _isBuyerType(
+    String? currentType,
+    String type,
+  ) {
+    if (currentType == null) return false;
+
+    return currentType
+            .trim()
+            .toLowerCase() ==
+        type.trim().toLowerCase();
   }
 
   Widget _typeCard(
@@ -233,7 +420,8 @@ class BuyerProfileScreen extends StatelessWidget {
     return Expanded(
       child: Container(
         height: 45,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: selected
               ? const Color(0xFFE5F0EA)
@@ -249,7 +437,8 @@ class BuyerProfileScreen extends StatelessWidget {
           children: [
             Text(
               icon,
-              style: const TextStyle(fontSize: 13),
+              style:
+                  const TextStyle(fontSize: 13),
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -276,25 +465,28 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= STATS =================
 
-  Widget _buildStats() {
+  Widget _buildStats(
+    int enquiryCount,
+    int orderCount,
+  ) {
     return Row(
       children: [
         _statCard(
-          '18',
+          '—',
           'Saved',
           Icons.favorite_border,
         ),
         const SizedBox(width: 7),
         _statCard(
-          '7',
+          enquiryCount.toString(),
           'Enquiries Sent',
           Icons.send_outlined,
         ),
         const SizedBox(width: 7),
         _statCard(
-          '3',
-          'Responded',
-          Icons.chat_bubble_outline,
+          orderCount.toString(),
+          'Orders',
+          Icons.shopping_bag_outlined,
         ),
       ],
     );
@@ -365,13 +557,15 @@ class BuyerProfileScreen extends StatelessWidget {
         children: [
           ...categories.map(
             (category) => Container(
-              padding: const EdgeInsets.symmetric(
+              padding:
+                  const EdgeInsets.symmetric(
                 horizontal: 9,
                 vertical: 6,
               ),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8F0E3),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius:
+                    BorderRadius.circular(8),
                 border: Border.all(
                   color: const Color(0xFFD2B48C),
                 ),
@@ -386,13 +580,15 @@ class BuyerProfileScreen extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
+            padding:
+                const EdgeInsets.symmetric(
               horizontal: 9,
               vertical: 6,
             ),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius:
+                  BorderRadius.circular(8),
               border: Border.all(
                 color: const Color(0xFFD2B48C),
               ),
@@ -413,52 +609,91 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= RECENT ENQUIRIES =================
 
-  Widget _buildRecentEnquiries() {
+  Widget _buildRecentEnquiries(
+    AsyncValue enquiriesAsync,
+  ) {
     return _section(
       title: 'RECENT ENQUIRIES',
-      child: Column(
-        children: [
-          _enquiryRow(
-            '👩',
-            'Sita Devi',
-            'Blue Pottery',
-            'Replied',
-            true,
+      child: enquiriesAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.all(10),
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+            ),
           ),
-          const SizedBox(height: 6),
-          _enquiryRow(
-            '👨',
-            'Ram Lal',
-            'Handwoven Textiles',
-            'Pending',
-            false,
+        ),
+        error: (_, __) => const Text(
+          'Unable to load enquiries',
+          style: TextStyle(
+            fontSize: 7,
+            color: Color(0xFFB65B3A),
           ),
-          const SizedBox(height: 6),
-          _enquiryRow(
-            '👩',
-            'Meena Bai',
-            'Lac Jewellery',
-            'Pending',
-            false,
-          ),
-        ],
+        ),
+        data: (enquiries) {
+          if (enquiries.isEmpty) {
+            return const Text(
+              'No enquiries yet.',
+              style: TextStyle(
+                fontSize: 7,
+                color: Color(0xFF9A806A),
+              ),
+            );
+          }
+
+          final visibleEnquiries =
+              enquiries.take(3).toList();
+
+          return Column(
+            children: [
+              ...List.generate(
+                visibleEnquiries.length,
+                (index) {
+                  final enquiry =
+                      visibleEnquiries[index];
+
+                  return Padding(
+                    padding:
+                        EdgeInsets.only(
+                      bottom: index ==
+                              visibleEnquiries.length -
+                                  1
+                          ? 0
+                          : 6,
+                    ),
+                    child: _enquiryRow(
+                      enquiry.id,
+                      enquiry.status,
+                      enquiry.message,
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   Widget _enquiryRow(
-    String avatar,
-    String name,
-    String craft,
-    String status,
-    bool replied,
+    String id,
+    String? status,
+    String? message,
   ) {
+    final isReplied =
+        status?.toLowerCase() == 'replied' ||
+        status?.toLowerCase() == 'responded' ||
+        status?.toLowerCase() == 'accepted';
+
     return Container(
       height: 43,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius:
+            BorderRadius.circular(9),
         border: Border.all(
           color: const Color(0xFFE1D0BA),
         ),
@@ -472,22 +707,22 @@ class BuyerProfileScreen extends StatelessWidget {
               color: Color(0xFFEDE0CC),
               shape: BoxShape.circle,
             ),
-            child: Center(
-              child: Text(
-                avatar,
-                style: const TextStyle(fontSize: 13),
-              ),
+            child: const Icon(
+              Icons.chat_bubble_outline,
+              size: 13,
+              color: Color(0xFF8B5E34),
             ),
           ),
           const SizedBox(width: 7),
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  'Enquiry ${id.length > 8 ? id.substring(0, 8) : id}',
                   style: const TextStyle(
                     fontSize: 7.5,
                     fontWeight: FontWeight.bold,
@@ -495,7 +730,12 @@ class BuyerProfileScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  craft,
+                  message?.isNotEmpty == true
+                      ? message!
+                      : 'Enquiry message',
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 6.5,
                     color: Color(0xFF9A806A),
@@ -505,22 +745,24 @@ class BuyerProfileScreen extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
+            padding:
+                const EdgeInsets.symmetric(
               horizontal: 7,
               vertical: 4,
             ),
             decoration: BoxDecoration(
-              color: replied
+              color: isReplied
                   ? const Color(0xFFE5F1EC)
                   : const Color(0xFFF8E9D9),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius:
+                  BorderRadius.circular(6),
             ),
             child: Text(
-              status,
+              status ?? 'Pending',
               style: TextStyle(
                 fontSize: 6.5,
                 fontWeight: FontWeight.w600,
-                color: replied
+                color: isReplied
                     ? const Color(0xFF3D765F)
                     : const Color(0xFFB65B3A),
               ),
@@ -533,74 +775,72 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= ORDER HISTORY =================
 
-  Widget _buildOrderHistory() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFFE0CFB8),
+  Widget _buildOrderHistory(int orderCount) {
+    return GestureDetector(
+      onTap: () {
+        context.push('/buyer-orders');
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius:
+              BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFFE0CFB8),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.receipt_long_outlined,
-            size: 19,
-            color: Color(0xFFB09A84),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order History',
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF9A806A),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.receipt_long_outlined,
+              size: 19,
+              color: Color(0xFFB09A84),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Order History',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF604532),
+                    ),
                   ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Track orders placed directly with artisans.',
-                  style: TextStyle(
-                    fontSize: 6.5,
-                    color: Color(0xFFB09A84),
+                  const SizedBox(height: 3),
+                  Text(
+                    orderCount == 0
+                        ? 'No orders placed yet.'
+                        : '$orderCount order${orderCount == 1 ? '' : 's'} placed.',
+                    style: const TextStyle(
+                      fontSize: 6.5,
+                      color: Color(0xFF9A806A),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 7,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF2EBDD),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'Coming Soon',
-              style: TextStyle(
-                fontSize: 6,
-                color: Color(0xFFAA927E),
+                ],
               ),
             ),
-          ),
-        ],
+            const Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Color(0xFFAA927E),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ================= BUTTONS =================
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(
+    BuildContext context,
+  ) {
     return Row(
       children: [
         Expanded(
@@ -609,12 +849,18 @@ class BuyerProfileScreen extends StatelessWidget {
               context.go('/buyer-home');
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFB65B3A),
+              backgroundColor:
+                  const Color(0xFFB65B3A),
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 12,
+              ),
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(9),
               ),
             ),
             child: const Text(
@@ -629,15 +875,21 @@ class BuyerProfileScreen extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: OutlinedButton(
-            onPressed: () {},
+            onPressed: _showEditProfileDialog,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF8B5E34),
+              foregroundColor:
+                  const Color(0xFF8B5E34),
               side: const BorderSide(
                 color: Color(0xFFB65B3A),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 11,
+              ),
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(9),
               ),
             ),
             child: const Text(
@@ -653,6 +905,249 @@ class BuyerProfileScreen extends StatelessWidget {
     );
   }
 
+  // ================= EDIT PROFILE =================
+
+  Future<void> _showEditProfileDialog() async {
+    final profile =
+        ref.read(buyerProfileProvider).valueOrNull;
+
+    if (profile == null) return;
+
+    final nameController =
+        TextEditingController(
+      text: profile.name ?? '',
+    );
+
+    final businessNameController =
+        TextEditingController(
+      text: profile.businessName ?? '',
+    );
+
+    final businessTypeController =
+        TextEditingController(
+      text: profile.businessType ?? '',
+    );
+
+    final stateController =
+        TextEditingController(
+      text: profile.state ?? '',
+    );
+
+    final districtController =
+        TextEditingController(
+      text: profile.district ?? '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder:
+              (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor:
+                  const Color(0xFFF6F1E7),
+              title: const Text(
+                'Edit Profile',
+                style: TextStyle(
+                  fontFamily: 'serif',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF604532),
+                ),
+              ),
+              content:
+                  SingleChildScrollView(
+                child: Column(
+                  mainAxisSize:
+                      MainAxisSize.min,
+                  children: [
+                    _editField(
+                      nameController,
+                      'Name',
+                    ),
+                    const SizedBox(height: 9),
+                    _editField(
+                      businessNameController,
+                      'Business name',
+                    ),
+                    const SizedBox(height: 9),
+                    _editField(
+                      businessTypeController,
+                      'Business type',
+                    ),
+                    const SizedBox(height: 9),
+                    _editField(
+                      stateController,
+                      'State',
+                    ),
+                    const SizedBox(height: 9),
+                    _editField(
+                      districtController,
+                      'District',
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isUpdating
+                      ? null
+                      : () {
+                          Navigator.pop(
+                            dialogContext,
+                          );
+                        },
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF8B5E34),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  style:
+                      ElevatedButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFF8B5E34),
+                    foregroundColor:
+                        Colors.white,
+                  ),
+                  onPressed: _isUpdating
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            _isUpdating = true;
+                          });
+
+                          final success =
+                              await _updateProfile(
+                            nameController.text,
+                            businessNameController
+                                .text,
+                            businessTypeController
+                                .text,
+                            stateController.text,
+                            districtController
+                                .text,
+                          );
+
+                          if (!mounted) return;
+
+                          if (success) {
+                            Navigator.pop(
+                              dialogContext,
+                            );
+
+                            ScaffoldMessenger
+                                .of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Profile updated successfully',
+                                ),
+                              ),
+                            );
+                          } else {
+                            setDialogState(() {
+                              _isUpdating = false;
+                            });
+
+                            ScaffoldMessenger
+                                .of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Failed to update profile',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  child: _isUpdating
+                      ? const SizedBox(
+                          width: 15,
+                          height: 15,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Save',
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    businessNameController.dispose();
+    businessTypeController.dispose();
+    stateController.dispose();
+    districtController.dispose();
+  }
+
+  Widget _editField(
+    TextEditingController controller,
+    String label,
+  ) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          fontSize: 11,
+          color: Color(0xFF8B6B51),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(8),
+          borderSide: const BorderSide(
+            color: Color(0xFFD2B48C),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _updateProfile(
+    String name,
+    String businessName,
+    String businessType,
+    String state,
+    String district,
+  ) async {
+    try {
+      await ref
+          .read(
+            buyerProfileRepositoryProvider,
+          )
+          .updateProfile(
+            name: name.trim(),
+            businessName:
+                businessName.trim(),
+            businessType:
+                businessType.trim(),
+            state: state.trim(),
+            district: district.trim(),
+          );
+
+      ref.invalidate(
+        buyerProfileProvider,
+      );
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ================= SECTION =================
 
   Widget _section({
@@ -664,13 +1159,15 @@ class BuyerProfileScreen extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius:
+            BorderRadius.circular(10),
         border: Border.all(
           color: const Color(0xFFE0CFB8),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             title,
@@ -690,7 +1187,9 @@ class BuyerProfileScreen extends StatelessWidget {
 
   // ================= BOTTOM NAV =================
 
-  Widget _buildBottomNavigation(BuildContext context) {
+  Widget _buildBottomNavigation(
+    BuildContext context,
+  ) {
     final items = [
       (Icons.home_rounded, 'Home'),
       (Icons.search_rounded, 'Search'),
@@ -710,7 +1209,8 @@ class BuyerProfileScreen extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceAround,
         children: List.generate(
           items.length,
           (index) {
@@ -721,13 +1221,14 @@ class BuyerProfileScreen extends StatelessWidget {
                 if (index == 0) {
                   context.go('/buyer-home');
                 } else if (index == 1) {
-                  context.push('/buyer-search');
+                  context.go('/buyer-search');
                 } else if (index == 3) {
-                  context.push('/buyer-orders');
+                  context.go('/buyer-orders');
                 }
               },
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
                 children: [
                   Container(
                     width: 37,

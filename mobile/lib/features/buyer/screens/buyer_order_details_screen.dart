@@ -1,58 +1,112 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class BuyerOrderDetailsScreen extends StatelessWidget {
-  const BuyerOrderDetailsScreen({super.key});
+import '../providers/buyer_provider.dart';
+import '../data/buyer_order_model.dart';
+
+class BuyerOrderDetailsScreen extends ConsumerWidget {
+  final String orderId;
+
+  const BuyerOrderDetailsScreen({
+    super.key,
+    required this.orderId,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final orderAsync =
+        ref.watch(buyerOrderDetailProvider(orderId));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  16,
-                  10,
-                  16,
-                  25,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildOrderHeader(),
-                    const SizedBox(height: 12),
-                    _buildProductCard(),
-                    const SizedBox(height: 14),
-                    _buildProgress(),
-                    const SizedBox(height: 14),
-                    _buildDeliveryDetails(),
-                    const SizedBox(height: 14),
-                    _buildPaymentDetails(),
-                    const SizedBox(height: 14),
-                    _buildBuyerProtection(),
-                  ],
+      body: orderAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(),
+        ),
+        error: (error, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 42,
+                color: Color(0xFFB65B3A),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Unable to load order',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF604532),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(
+                    buyerOrderDetailProvider(orderId),
+                  );
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (order) => _buildOrderScreen(
+          context,
+          order,
         ),
       ),
     );
   }
 
-  // ------------------------------------------------------------
-  // HEADER
-  // ------------------------------------------------------------
+  Widget _buildOrderScreen(
+    BuildContext context,
+    BuyerOrder order,
+  ) {
+    return SafeArea(
+      child: Column(
+        children: [
+          _buildHeader(context),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                10,
+                16,
+                25,
+              ),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  _buildOrderHeader(order),
+                  const SizedBox(height: 12),
+                  _buildProductCard(order),
+                  const SizedBox(height: 14),
+                  _buildProgress(order),
+                  const SizedBox(height: 14),
+                  _buildDeliveryDetails(),
+                  const SizedBox(height: 14),
+                  _buildPaymentDetails(order),
+                  const SizedBox(height: 14),
+                  _buildBuyerProtection(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHeader(BuildContext context) {
     return Container(
       height: 55,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFF6F1E7),
         border: Border(
@@ -71,7 +125,8 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
               height: 32,
               decoration: BoxDecoration(
                 color: const Color(0xFFEDE0CC),
-                borderRadius: BorderRadius.circular(9),
+                borderRadius:
+                    BorderRadius.circular(9),
               ),
               child: const Icon(
                 Icons.arrow_back,
@@ -97,7 +152,8 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius:
+                  BorderRadius.circular(9),
               border: Border.all(
                 color: const Color(0xFFD2B48C),
               ),
@@ -113,29 +169,26 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  // ------------------------------------------------------------
-  // ORDER HEADER
-  // ------------------------------------------------------------
-
-  Widget _buildOrderHeader() {
+  Widget _buildOrderHeader(BuyerOrder order) {
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               Text(
-                'ORD-2847',
-                style: TextStyle(
+                order.id,
+                style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF9A806A),
                 ),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               Text(
-                'Ordered 20 Aug 2026 · Qty 2',
-                style: TextStyle(
+                'Qty ${order.requestedQty ?? '-'}',
+                style: const TextStyle(
                   fontSize: 8,
                   color: Color(0xFF765944),
                 ),
@@ -143,43 +196,45 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 9,
-            vertical: 5,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEDE0CC),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Row(
-            children: [
-              Icon(
-                Icons.circle,
-                size: 6,
-                color: Color(0xFF8B5E34),
-              ),
-              SizedBox(width: 4),
-              Text(
-                'Making',
-                style: TextStyle(
-                  fontSize: 7,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF8B5E34),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _statusChip(order.status),
       ],
     );
   }
 
-  // ------------------------------------------------------------
-  // PRODUCT
-  // ------------------------------------------------------------
+  Widget _statusChip(String? status) {
+    final value = status ?? 'Unknown';
 
-  Widget _buildProductCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE0CC),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.circle,
+            size: 6,
+            color: Color(0xFF8B5E34),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 7,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF8B5E34),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductCard(BuyerOrder order) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -191,53 +246,50 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: Image.network(
-              'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=300',
-              width: 68,
-              height: 68,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) {
-                return Container(
-                  width: 68,
-                  height: 68,
-                  color: const Color(0xFFE8D8C0),
-                  child: const Icon(
-                    Icons.image_outlined,
-                    color: Color(0xFF9B7653),
-                  ),
-                );
-              },
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8D8C0),
+              borderRadius:
+                  BorderRadius.circular(9),
+            ),
+            child: const Icon(
+              Icons.shopping_bag_outlined,
+              color: Color(0xFF9B7653),
+              size: 28,
             ),
           ),
-
           const SizedBox(width: 10),
-
-          const Expanded(
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Blue Pottery Vase',
-                  style: TextStyle(
+                  'Product ${order.productId ?? '-'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF604532),
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 5),
                 Text(
-                  'by Sita Devi · Jaipur, Rajasthan',
-                  style: TextStyle(
+                  'Artisan ${order.artisanId ?? '-'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     fontSize: 7,
                     color: Color(0xFF9A806A),
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
-                  '₹2,120',
-                  style: TextStyle(
+                  '₹${_formatPrice(order.unitPrice)} × ${order.requestedQty ?? 0}',
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF8B5E34),
@@ -251,17 +303,42 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  // ------------------------------------------------------------
-  // PROGRESS
-  // ------------------------------------------------------------
+  String _formatPrice(double? price) {
+    if (price == null) return '-';
 
-  Widget _buildProgress() {
+    return price
+        .toStringAsFixed(2)
+        .replaceAll(RegExp(r'\.00$'), '');
+  }
+
+  Widget _buildProgress(BuyerOrder order) {
+    final status =
+        (order.status ?? '').toUpperCase();
+
     final steps = [
       ('Placed', true),
-      ('Confirmed', true),
-      ('Making', true),
+      (
+        'Confirmed',
+        [
+          'CONFIRMED',
+          'ACCEPTED',
+          'PARTIALLY_ACCEPTED',
+          'FULFILLING',
+          'COMPLETED',
+        ].contains(status),
+      ),
+      (
+        'Making',
+        [
+          'FULFILLING',
+          'COMPLETED',
+        ].contains(status),
+      ),
       ('Shipped', false),
-      ('Delivered', false),
+      (
+        'Delivered',
+        status == 'COMPLETED',
+      ),
     ];
 
     return _sectionCard(
@@ -273,10 +350,16 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
               steps.length * 2 - 1,
               (index) {
                 if (index.isOdd) {
+                  final leftCompleted =
+                      steps[index ~/ 2].$2;
+                  final rightCompleted =
+                      steps[(index ~/ 2) + 1].$2;
+
                   return Expanded(
                     child: Container(
                       height: 2,
-                      color: index < 5
+                      color: leftCompleted &&
+                              rightCompleted
                           ? const Color(0xFF8B5E34)
                           : const Color(0xFFD8C5AC),
                     ),
@@ -284,7 +367,8 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
                 }
 
                 final stepIndex = index ~/ 2;
-                final completed = steps[stepIndex].$2;
+                final completed =
+                    steps[stepIndex].$2;
 
                 return Container(
                   width: 18,
@@ -306,36 +390,29 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
               },
             ),
           ),
-
           const SizedBox(height: 7),
-
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: steps.map(
-              (step) {
-                return Text(
-                  step.$1,
-                  style: TextStyle(
-                    fontSize: 6.5,
-                    fontWeight: step.$2
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                    color: step.$2
-                        ? const Color(0xFF604532)
-                        : const Color(0xFFAA927E),
-                  ),
-                );
-              },
-            ).toList(),
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
+            children: steps.map((step) {
+              return Text(
+                step.$1,
+                style: TextStyle(
+                  fontSize: 6.5,
+                  fontWeight: step.$2
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                  color: step.$2
+                      ? const Color(0xFF604532)
+                      : const Color(0xFFAA927E),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
     );
   }
-
-  // ------------------------------------------------------------
-  // DELIVERY
-  // ------------------------------------------------------------
 
   Widget _buildDeliveryDetails() {
     return _sectionCard(
@@ -345,7 +422,7 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
           _infoRow(
             Icons.calendar_today_outlined,
             'Expected delivery',
-            '5 Sep 2026',
+            'Not available',
           ),
           const Divider(
             height: 18,
@@ -354,7 +431,7 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
           _infoRow(
             Icons.local_shipping_outlined,
             'Tracking ID',
-            'INDC-84928',
+            'Not available',
           ),
           const Divider(
             height: 18,
@@ -363,67 +440,44 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
           _infoRow(
             Icons.location_on_outlined,
             'Delivery address',
-            'Mumbai, Maharashtra',
+            'Not available',
           ),
         ],
       ),
     );
   }
 
-  // ------------------------------------------------------------
-  // PAYMENT
-  // ------------------------------------------------------------
+  Widget _buildPaymentDetails(BuyerOrder order) {
+    final quantity = order.requestedQty ?? 0;
+    final unitPrice = order.unitPrice ?? 0;
+    final total = quantity * unitPrice;
 
-  Widget _buildPaymentDetails() {
     return _sectionCard(
       title: 'Payment Details',
       child: Column(
         children: [
           _priceRow(
-            'Product price',
-            '₹2,000',
+            'Unit price',
+            '₹${_formatPrice(order.unitPrice)}',
           ),
           const SizedBox(height: 7),
           _priceRow(
-            'Delivery',
-            '₹80',
+            'Quantity',
+            '$quantity',
           ),
           const Divider(
             height: 18,
             color: Color(0xFFF0E4D1),
           ),
           _priceRow(
-            'Total paid',
-            '₹2,080',
+            'Total',
+            '₹${_formatPrice(total)}',
             bold: true,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                size: 13,
-                color: Color(0xFF3D765F),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'Payment successful',
-                style: TextStyle(
-                  fontSize: 7,
-                  color: Color(0xFF3D765F),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
-
-  // ------------------------------------------------------------
-  // BUYER PROTECTION
-  // ------------------------------------------------------------
 
   Widget _buildBuyerProtection() {
     return Container(
@@ -458,7 +512,7 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'Full refund if not as described · 7-day returns',
+                  'Order information is shown from the backend.',
                   style: TextStyle(
                     fontSize: 7,
                     color: Color(0xFF668A7B),
@@ -471,10 +525,6 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
       ),
     );
   }
-
-  // ------------------------------------------------------------
-  // HELPERS
-  // ------------------------------------------------------------
 
   Widget _sectionCard({
     required String title,
@@ -491,7 +541,8 @@ class BuyerOrderDetailsScreen extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             title.toUpperCase(),

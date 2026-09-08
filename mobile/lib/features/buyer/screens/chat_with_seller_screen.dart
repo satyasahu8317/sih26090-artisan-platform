@@ -1,84 +1,95 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ChatWithSellerScreen extends StatefulWidget {
-  const ChatWithSellerScreen({super.key});
+import '../data/buyer_enquiry_model.dart';
+import '../providers/buyer_provider.dart';
+
+class ChatWithSellerScreen extends ConsumerStatefulWidget {
+  final String enquiryId;
+
+  const ChatWithSellerScreen({
+    super.key,
+    required this.enquiryId,
+  });
 
   @override
-  State<ChatWithSellerScreen> createState() =>
+  ConsumerState<ChatWithSellerScreen> createState() =>
       _ChatWithSellerScreenState();
 }
 
-class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+class _ChatWithSellerScreenState
+    extends ConsumerState<ChatWithSellerScreen> {
+  final TextEditingController _messageController =
+      TextEditingController();
 
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text: 'Can you make 20 pieces for bulk order?',
-      time: '10:32 AM',
-      isBuyer: true,
-    ),
-    ChatMessage(
-      text: 'Yes, I can. For 20 pieces it will take about 15 days.',
-      time: '10:35 AM',
-      isBuyer: false,
-    ),
-    ChatMessage(
-      text: 'What will be the price for bulk?',
-      time: '10:36 AM',
-      isBuyer: true,
-    ),
-    ChatMessage(
-      text: 'For 20 pieces, I can offer ₹900 each.\nTotal ₹18,000.',
-      time: '10:38 AM',
-      isBuyer: false,
-    ),
-  ];
+  final ScrollController _scrollController =
+      ScrollController();
 
-  final List<String> _quickReplies = [
-    'Ask about price',
-    'Ask about bulk',
-    'Ask about delivery',
-  ];
+  Timer? _pollTimer;
 
-  void _sendMessage() {
+  @override
+  void initState() {
+    super.initState();
+
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (mounted) {
+          ref.invalidate(
+            buyerEnquiryMessagesProvider(widget.enquiryId),
+          );
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
 
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: text,
-          time: _currentTime(),
-          isBuyer: true,
-        ),
-      );
-    });
-
     _messageController.clear();
 
-    _scrollToBottom();
+    try {
+      await ref
+          .read(buyerEnquiryRepositoryProvider)
+          .sendMessage(
+            enquiryId: widget.enquiryId,
+            message: text,
+          );
+
+      ref.invalidate(
+        buyerEnquiryMessagesProvider(widget.enquiryId),
+      );
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+
+      _messageController.text = text;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to send message'),
+        ),
+      );
+    }
   }
 
   void _sendQuickReply(String text) {
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: text,
-          time: _currentTime(),
-          isBuyer: true,
-        ),
-      );
-    });
-
-    _scrollToBottom();
-  }
-
-  String _currentTime() {
-    final now = TimeOfDay.now();
-    return now.format(context);
+    _messageController.text = text;
+    _sendMessage();
   }
 
   void _scrollToBottom() {
@@ -87,21 +98,38 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
 
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     });
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) return '';
+
+    final local = dateTime.toLocal();
+
+    final hour = local.hour % 12 == 0
+        ? 12
+        : local.hour % 12;
+
+    final minute =
+        local.minute.toString().padLeft(2, '0');
+
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+
+    return '$hour:$minute $period';
   }
 
   @override
   Widget build(BuildContext context) {
+    final messagesAsync =
+        ref.watch(
+          buyerEnquiryMessagesProvider(
+            widget.enquiryId,
+          ),
+        );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
       resizeToAvoidBottomInset: true,
@@ -109,10 +137,59 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
         child: Column(
           children: [
             _buildHeader(),
-            _buildProductCard(),
+
             Expanded(
-              child: _buildMessages(),
+              child: messagesAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                error: (error, stack) =>
+                    _buildError(),
+                data: (messages) {
+                  if (messages.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No messages yet',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF806F60),
+                        ),
+                      ),
+                    );
+                  }
+
+                  WidgetsBinding.instance
+                      .addPostFrameCallback(
+                    (_) => _scrollToBottom(),
+                  );
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(
+                      12,
+                      12,
+                      12,
+                      8,
+                    ),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+
+                      final isBuyer =
+                          message.senderRole
+                                  ?.toUpperCase() ==
+                              'BUYER';
+
+                      return _buildMessageBubble(
+                        message,
+                        isBuyer,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
+
             _buildQuickReplies(),
             _buildMessageInput(),
           ],
@@ -121,14 +198,16 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // HEADER
-  // ------------------------------------------------------------
+  // ============================================================
 
   Widget _buildHeader() {
     return Container(
       height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFF6F1E7),
         border: Border(
@@ -156,7 +235,6 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               ),
             ),
           ),
-
           const SizedBox(width: 8),
 
           Container(
@@ -167,9 +245,10 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               shape: BoxShape.circle,
             ),
             child: const Center(
-              child: Text(
-                '👩',
-                style: TextStyle(fontSize: 19),
+              child: Icon(
+                Icons.person,
+                size: 20,
+                color: Color(0xFF8B5E34),
               ),
             ),
           ),
@@ -178,11 +257,13 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
 
           const Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Sita Devi',
+                  'Artisan',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -190,22 +271,12 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
                   ),
                 ),
                 SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      size: 6,
-                      color: Color(0xFF3D765F),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Online · Jaipur',
-                      style: TextStyle(
-                        fontSize: 7,
-                        color: Color(0xFF668A7B),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Enquiry conversation',
+                  style: TextStyle(
+                    fontSize: 7,
+                    color: Color(0xFF668A7B),
+                  ),
                 ),
               ],
             ),
@@ -234,101 +305,16 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
     );
   }
 
-  // ------------------------------------------------------------
-  // PRODUCT CARD
-  // ------------------------------------------------------------
-
-  Widget _buildProductCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 5),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: const Color(0xFFD2B48C),
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: Image.network(
-              'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=200',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) {
-                return Container(
-                  width: 40,
-                  height: 40,
-                  color: const Color(0xFFE8D8C0),
-                  child: const Icon(
-                    Icons.image_outlined,
-                    size: 18,
-                    color: Color(0xFF9B7653),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Blue Pottery Vase',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF604532),
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  '₹800 – ₹1,200',
-                  style: TextStyle(
-                    fontSize: 7,
-                    color: Color(0xFF8B5E34),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const Icon(
-            Icons.chevron_right,
-            size: 18,
-            color: Color(0xFFAA927E),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------
+  // ============================================================
   // MESSAGES
-  // ------------------------------------------------------------
+  // ============================================================
 
-  Widget _buildMessages() {
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final message = _messages[index];
-
-        return _buildMessageBubble(message);
-      },
-    );
-  }
-
-  Widget _buildMessageBubble(ChatMessage message) {
+  Widget _buildMessageBubble(
+    BuyerEnquiryMessage message,
+    bool isBuyer,
+  ) {
     return Align(
-      alignment: message.isBuyer
+      alignment: isBuyer
           ? Alignment.centerRight
           : Alignment.centerLeft,
       child: Container(
@@ -343,46 +329,46 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
           6,
         ),
         decoration: BoxDecoration(
-          color: message.isBuyer
+          color: isBuyer
               ? const Color(0xFF986237)
               : Colors.white,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(11),
             topRight: const Radius.circular(11),
             bottomLeft: Radius.circular(
-              message.isBuyer ? 11 : 3,
+              isBuyer ? 11 : 3,
             ),
             bottomRight: Radius.circular(
-              message.isBuyer ? 3 : 11,
+              isBuyer ? 3 : 11,
             ),
           ),
-          border: message.isBuyer
+          border: isBuyer
               ? null
               : Border.all(
                   color: const Color(0xFFD2B48C),
                 ),
         ),
         child: Column(
-          crossAxisAlignment: message.isBuyer
+          crossAxisAlignment: isBuyer
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
             Text(
-              message.text,
+              message.message,
               style: TextStyle(
                 fontSize: 8.5,
                 height: 1.35,
-                color: message.isBuyer
+                color: isBuyer
                     ? Colors.white
                     : const Color(0xFF604532),
               ),
             ),
             const SizedBox(height: 3),
             Text(
-              message.time,
+              _formatTime(message.createdAt),
               style: TextStyle(
                 fontSize: 6,
-                color: message.isBuyer
+                color: isBuyer
                     ? const Color(0xFFE8D7C7)
                     : const Color(0xFFAA927E),
               ),
@@ -393,22 +379,31 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
     );
   }
 
-  // ------------------------------------------------------------
+  // ============================================================
   // QUICK REPLIES
-  // ------------------------------------------------------------
+  // ============================================================
 
   Widget _buildQuickReplies() {
+    const replies = [
+      'Ask about price',
+      'Ask about bulk',
+      'Ask about delivery',
+    ];
+
     return SizedBox(
       height: 36,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+        ),
         scrollDirection: Axis.horizontal,
-        itemCount: _quickReplies.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemCount: replies.length,
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: 6),
         itemBuilder: (context, index) {
           return GestureDetector(
             onTap: () {
-              _sendQuickReply(_quickReplies[index]);
+              _sendQuickReply(replies[index]);
             },
             child: Container(
               padding: const EdgeInsets.symmetric(
@@ -417,13 +412,14 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: const Color(0xFFF0E4D1),
-                borderRadius: BorderRadius.circular(9),
+                borderRadius:
+                    BorderRadius.circular(9),
                 border: Border.all(
                   color: const Color(0xFFD2B48C),
                 ),
               ),
               child: Text(
-                _quickReplies[index],
+                replies[index],
                 style: const TextStyle(
                   fontSize: 7,
                   fontWeight: FontWeight.w600,
@@ -437,13 +433,18 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
     );
   }
 
-  // ------------------------------------------------------------
-  // MESSAGE INPUT
-  // ------------------------------------------------------------
+  // ============================================================
+  // INPUT
+  // ============================================================
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
+      padding: const EdgeInsets.fromLTRB(
+        10,
+        7,
+        10,
+        9,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFF6F1E7),
         border: Border(
@@ -454,7 +455,8 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment:
+            CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Container(
@@ -464,7 +466,8 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(11),
+                borderRadius:
+                    BorderRadius.circular(11),
                 border: Border.all(
                   color: const Color(0xFFD2B48C),
                 ),
@@ -473,15 +476,18 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
                 controller: _messageController,
                 minLines: 1,
                 maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
+                textInputAction:
+                    TextInputAction.newline,
+                decoration:
+                    const InputDecoration(
                   hintText: 'Type a message...',
                   hintStyle: TextStyle(
                     fontSize: 8,
                     color: Color(0xFFB49B88),
                   ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
+                  contentPadding:
+                      EdgeInsets.symmetric(
                     horizontal: 11,
                     vertical: 11,
                   ),
@@ -489,9 +495,7 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               ),
             ),
           ),
-
           const SizedBox(width: 7),
-
           GestureDetector(
             onTap: _sendMessage,
             child: Container(
@@ -499,7 +503,8 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: const Color(0xFF8B5E34),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius:
+                    BorderRadius.circular(11),
               ),
               child: const Icon(
                 Icons.send_rounded,
@@ -512,16 +517,37 @@ class _ChatWithSellerScreenState extends State<ChatWithSellerScreen> {
       ),
     );
   }
-}
 
-class ChatMessage {
-  final String text;
-  final String time;
-  final bool isBuyer;
-
-  ChatMessage({
-    required this.text,
-    required this.time,
-    required this.isBuyer,
-  });
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            size: 40,
+            color: Colors.redAccent,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Unable to load messages',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () {
+              ref.invalidate(
+                buyerEnquiryMessagesProvider(
+                  widget.enquiryId,
+                ),
+              );
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
 }

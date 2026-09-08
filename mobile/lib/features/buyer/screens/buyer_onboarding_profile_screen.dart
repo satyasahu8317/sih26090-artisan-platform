@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class BuyerOnboardingProfileScreen extends StatefulWidget {
+import '../providers/buyer_provider.dart';
+
+class BuyerOnboardingProfileScreen extends ConsumerStatefulWidget {
   const BuyerOnboardingProfileScreen({super.key});
 
   @override
-  State<BuyerOnboardingProfileScreen> createState() => _BuyerProfileScreenState();
+  ConsumerState<BuyerOnboardingProfileScreen> createState() =>
+      _BuyerProfileScreenState();
 }
 
-class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
-  final TextEditingController nameController = TextEditingController();
+class _BuyerProfileScreenState
+    extends ConsumerState<BuyerOnboardingProfileScreen> {
+  final TextEditingController nameController =
+      TextEditingController();
+
   final TextEditingController organizationController =
       TextEditingController();
 
   String? selectedPurpose;
+
+  bool _isSaving = false;
 
   final List<Map<String, String>> purposes = [
     {
@@ -50,7 +59,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
 
   bool get canContinue =>
       nameController.text.trim().isNotEmpty &&
-      selectedPurpose != null;
+      selectedPurpose != null &&
+      !_isSaving;
 
   @override
   void dispose() {
@@ -59,11 +69,55 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
     super.dispose();
   }
 
-  void _continue() {
+  // ============================================================
+  // SAVE PROFILE
+  // ============================================================
+
+  Future<void> _continue() async {
     if (!canContinue) return;
 
-    context.go('/buyer-languages');
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await ref
+          .read(buyerProfileRepositoryProvider)
+          .updateProfile(
+            name: nameController.text.trim(),
+            businessName:
+                organizationController.text.trim().isEmpty
+                    ? null
+                    : organizationController.text.trim(),
+            businessType: selectedPurpose,
+          );
+
+      // Refresh profile data after successful update.
+      ref.invalidate(buyerProfileProvider);
+
+      if (!mounted) return;
+
+      context.go('/buyer-languages');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSaving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to save profile. Please try again.',
+          ),
+        ),
+      );
+    }
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -72,10 +126,14 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 390),
+            constraints: const BoxConstraints(
+              maxWidth: 390,
+            ),
             child: Column(
               children: [
-                // ---------------- TOP IMAGE / HEADER ----------------
+                // ==================================================
+                // TOP HEADER
+                // ==================================================
 
                 Container(
                   height: 180,
@@ -98,10 +156,13 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                             fontSize: 9,
                             letterSpacing: 1.2,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: Colors.white.withValues(
+                              alpha: 0.65,
+                            ),
                           ),
                         ),
                       ),
+
                       const Positioned(
                         left: 18,
                         top: 43,
@@ -115,6 +176,7 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                           ),
                         ),
                       ),
+
                       const Positioned(
                         left: 18,
                         top: 78,
@@ -128,24 +190,26 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                         ),
                       ),
 
-                   Positioned(
-  right: 0,
-  bottom: 0,
-  child: SizedBox(
-    width: 135,
-    height: 155,
-    child: Image.asset(
-      'assets/images/handbag.png',
-      fit: BoxFit.contain,
-      alignment: Alignment.bottomRight,
-    ),
-  ),
-),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                          width: 135,
+                          height: 155,
+                          child: Image.asset(
+                            'assets/images/handbag.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.bottomRight,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
 
-                // ---------------- FORM ----------------
+                // ==================================================
+                // FORM
+                // ==================================================
 
                 Expanded(
                   child: SingleChildScrollView(
@@ -156,7 +220,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                       10,
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         _buildLabel(
                           'YOUR FULL NAME',
@@ -181,7 +246,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                         const SizedBox(height: 6),
 
                         _buildTextField(
-                          controller: organizationController,
+                          controller:
+                              organizationController,
                           hintText: 'e.g. GiftWala Corp',
                           icon: Icons.business_outlined,
                         ),
@@ -197,7 +263,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
 
                         GridView.builder(
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
+                          physics:
+                              const NeverScrollableScrollPhysics(),
                           itemCount: purposes.length,
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
@@ -206,70 +273,109 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                             mainAxisSpacing: 7,
                             childAspectRatio: 1.75,
                           ),
-                          itemBuilder: (context, index) {
-                            final purpose = purposes[index];
-                            final title = purpose['title']!;
+                          itemBuilder: (
+                            context,
+                            index,
+                          ) {
+                            final purpose =
+                                purposes[index];
+
+                            final title =
+                                purpose['title']!;
+
                             final isSelected =
-                                selectedPurpose == title;
+                                selectedPurpose ==
+                                    title;
 
                             return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  selectedPurpose = title;
-                                });
-                              },
+                              onTap: _isSaving
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        selectedPurpose =
+                                            title;
+                                      });
+                                    },
                               child: Container(
-                                padding: const EdgeInsets.all(9),
-                                decoration: BoxDecoration(
+                                padding:
+                                    const EdgeInsets.all(
+                                  9,
+                                ),
+                                decoration:
+                                    BoxDecoration(
                                   color: isSelected
-                                      ? const Color(0xFFEDE0CC)
+                                      ? const Color(
+                                          0xFFEDE0CC,
+                                        )
                                       : Colors.white,
                                   borderRadius:
-                                      BorderRadius.circular(11),
+                                      BorderRadius.circular(
+                                    11,
+                                  ),
                                   border: Border.all(
                                     color: isSelected
-                                        ? const Color(0xFF8B5E34)
-                                        : const Color(0xFFD2B48C),
-                                    width: isSelected ? 1.5 : 1,
+                                        ? const Color(
+                                            0xFF8B5E34,
+                                          )
+                                        : const Color(
+                                            0xFFD2B48C,
+                                          ),
+                                    width: isSelected
+                                        ? 1.5
+                                        : 1,
                                   ),
                                 ),
                                 child: Row(
                                   children: [
                                     Text(
                                       purpose['icon']!,
-                                      style: const TextStyle(
+                                      style:
+                                          const TextStyle(
                                         fontSize: 18,
                                       ),
                                     ),
-                                    const SizedBox(width: 7),
+                                    const SizedBox(
+                                      width: 7,
+                                    ),
                                     Expanded(
                                       child: Column(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                            MainAxisAlignment
+                                                .center,
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                            CrossAxisAlignment
+                                                .start,
                                         children: [
                                           Text(
                                             title,
-                                            style: const TextStyle(
+                                            style:
+                                                const TextStyle(
                                               fontSize: 10,
                                               fontWeight:
-                                                  FontWeight.w700,
-                                              color:
-                                                  Color(0xFF604532),
+                                                  FontWeight
+                                                      .w700,
+                                              color: Color(
+                                                0xFF604532,
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(height: 2),
+                                          const SizedBox(
+                                            height: 2,
+                                          ),
                                           Text(
-                                            purpose['subtitle']!,
+                                            purpose[
+                                                'subtitle']!,
                                             maxLines: 2,
                                             overflow:
-                                                TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                                TextOverflow
+                                                    .ellipsis,
+                                            style:
+                                                const TextStyle(
                                               fontSize: 7.5,
                                               height: 1.1,
-                                              color:
-                                                  Color(0xFF9B806B),
+                                              color: Color(
+                                                0xFF9B806B,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -286,10 +392,13 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
                   ),
                 ),
 
-                // ---------------- PAGE INDICATOR ----------------
+                // ==================================================
+                // PAGE INDICATOR
+                // ==================================================
 
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
                   children: [
                     _dot(true),
                     const SizedBox(width: 6),
@@ -301,34 +410,54 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
 
                 const SizedBox(height: 10),
 
-                // ---------------- CONTINUE ----------------
+                // ==================================================
+                // CONTINUE BUTTON
+                // ==================================================
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: canContinue ? _continue : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B5E34),
+                      onPressed:
+                          canContinue ? _continue : null,
+                      style:
+                          ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color(0xFF8B5E34),
                         disabledBackgroundColor:
                             const Color(0xFFD9BE98),
                         foregroundColor: Colors.white,
                         disabledForegroundColor:
                             const Color(0xFFB99C76),
                         elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                        shape:
+                            RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(13),
                         ),
                       ),
-                      child: const Text(
-                        'Continue →',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 19,
+                              height: 19,
+                              child:
+                                  CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Continue →',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight:
+                                    FontWeight.w700,
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -341,6 +470,10 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
       ),
     );
   }
+
+  // ============================================================
+  // LABEL
+  // ============================================================
 
   Widget _buildLabel(
     String text, {
@@ -381,6 +514,10 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
     );
   }
 
+  // ============================================================
+  // TEXT FIELD
+  // ============================================================
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,
@@ -390,7 +527,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
       height: 43,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius:
+            BorderRadius.circular(10),
         border: Border.all(
           color: const Color(0xFFD2B48C),
         ),
@@ -412,13 +550,18 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
             fontSize: 9,
             color: Color(0xFFB49B88),
           ),
-          contentPadding: const EdgeInsets.symmetric(
+          contentPadding:
+              const EdgeInsets.symmetric(
             vertical: 13,
           ),
         ),
       ),
     );
   }
+
+  // ============================================================
+  // DOT
+  // ============================================================
 
   Widget _dot(bool active) {
     return Container(
@@ -428,7 +571,8 @@ class _BuyerProfileScreenState extends State<BuyerOnboardingProfileScreen> {
         color: active
             ? const Color(0xFF8B5E34)
             : const Color(0xFFD2B48C),
-        borderRadius: BorderRadius.circular(5),
+        borderRadius:
+            BorderRadius.circular(5),
       ),
     );
   }

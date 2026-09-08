@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class SearchScreen extends StatefulWidget {
+import '../data/buyer_product_model.dart';
+import '../providers/buyer_provider.dart';
+
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController =
       TextEditingController();
 
@@ -26,33 +30,6 @@ class _SearchScreenState extends State<SearchScreen> {
     {'name': 'Dhokra Jewellery', 'change': '15%'},
   ];
 
-  final List<Map<String, String>> _products = [
-    {
-      'name': 'Blue Pottery Vase',
-      'artisan': 'Sita Devi · Jaipur',
-      'price': '₹800–₹1,200',
-      'rating': '4.8',
-      'image':
-          'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=300',
-    },
-    {
-      'name': 'Handwoven Silk Scarf',
-      'artisan': 'Meena Kumari · Varanasi',
-      'price': '₹1,500–₹2,000',
-      'rating': '4.9',
-      'image':
-          'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300',
-    },
-    {
-      'name': 'Brass Bangle Set',
-      'artisan': 'Lakshmi Bai · Jaipur',
-      'price': '₹300–₹500',
-      'rating': '4.7',
-      'image':
-          'https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=300',
-    },
-  ];
-
   final List<Map<String, dynamic>> _collections = [
     {
       'name': 'Wedding Gifts',
@@ -68,13 +45,22 @@ class _SearchScreenState extends State<SearchScreen> {
     },
   ];
 
+  List<BuyerProduct> _products = [];
+
+  bool _isLoadingProducts = false;
+  String? _productError;
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  void _performSearch(String value) {
+  // ------------------------------------------------------------
+  // SEARCH
+  // ------------------------------------------------------------
+
+  Future<void> _performSearch(String value) async {
     final query = value.trim();
 
     if (query.isEmpty) return;
@@ -86,12 +72,42 @@ class _SearchScreenState extends State<SearchScreen> {
       if (_recentSearches.length > 3) {
         _recentSearches.removeLast();
       }
+
+      _isLoadingProducts = true;
+      _productError = null;
     });
 
     _searchController.clear();
-
     FocusScope.of(context).unfocus();
+
+    try {
+      final products = await ref
+          .read(buyerRepositoryProvider)
+          .getProducts(
+            page: 1,
+            limit: 20,
+            query: query,
+          );
+
+      if (!mounted) return;
+
+      setState(() {
+        _products = products;
+        _isLoadingProducts = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingProducts = false;
+        _productError = 'Failed to load products';
+      });
+    }
   }
+
+  // ------------------------------------------------------------
+  // RECENT SEARCHES
+  // ------------------------------------------------------------
 
   void _clearRecentSearches() {
     setState(() {
@@ -104,6 +120,15 @@ class _SearchScreenState extends State<SearchScreen> {
       _recentSearches.remove(search);
     });
   }
+
+  Future<void> _searchRecent(String search) async {
+    _searchController.text = search;
+    await _performSearch(search);
+  }
+
+  // ------------------------------------------------------------
+  // BUILD
+  // ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +278,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         ),
         const SizedBox(height: 7),
-
         if (_recentSearches.isEmpty)
           const Text(
             'No recent searches',
@@ -271,43 +295,46 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildRecentSearchItem(String search) {
-    return Container(
-      height: 31,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: const Color(0xFFD2B48C),
+    return GestureDetector(
+      onTap: () => _searchRecent(search),
+      child: Container(
+        height: 31,
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+            color: const Color(0xFFD2B48C),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.history,
-            size: 13,
-            color: Color(0xFFB0967E),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              search,
-              style: const TextStyle(
-                fontSize: 8,
-                color: Color(0xFF765944),
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _removeRecentSearch(search),
-            child: const Icon(
-              Icons.close,
+        child: Row(
+          children: [
+            const Icon(
+              Icons.history,
               size: 13,
               color: Color(0xFFB0967E),
             ),
-          ),
-        ],
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                search,
+                style: const TextStyle(
+                  fontSize: 8,
+                  color: Color(0xFF765944),
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _removeRecentSearch(search),
+              child: const Icon(
+                Icons.close,
+                size: 13,
+                color: Color(0xFFB0967E),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -330,7 +357,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         const SizedBox(height: 7),
-
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -345,64 +371,67 @@ class _SearchScreenState extends State<SearchScreen> {
               (index) {
                 final item = _trending[index];
 
-                return Container(
-                  height: 33,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    border: index == _trending.length - 1
-                        ? null
-                        : const Border(
-                            bottom: BorderSide(
-                              color: Color(0xFFF0E4D1),
+                return GestureDetector(
+                  onTap: () => _searchRecent(item['name']!),
+                  child: Container(
+                    height: 33,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      border: index == _trending.length - 1
+                          ? null
+                          : const Border(
+                              bottom: BorderSide(
+                                color: Color(0xFFF0E4D1),
+                              ),
+                            ),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: index == 0
+                                  ? const Color(0xFFB65B3A)
+                                  : const Color(0xFF9A806A),
                             ),
                           ),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                            color: index == 0
-                                ? const Color(0xFFB65B3A)
-                                : const Color(0xFF9A806A),
+                        ),
+                        Expanded(
+                          child: Text(
+                            item['name']!,
+                            style: const TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF604532),
+                            ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          item['name']!,
-                          style: const TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF604532),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5F1EC),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '↑ ${item['change']}',
+                            style: const TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF3D765F),
+                            ),
                           ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5F1EC),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '↑ ${item['change']}',
-                          style: const TextStyle(
-                            fontSize: 6.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3D765F),
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
@@ -436,41 +465,43 @@ class _SearchScreenState extends State<SearchScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _collections.length,
-            separatorBuilder: (_, _) =>
+            separatorBuilder: (_, __) =>
                 const SizedBox(width: 7),
             itemBuilder: (context, index) {
               final collection = _collections[index];
 
-              return Container(
-                width: 94,
-                decoration: BoxDecoration(
-                  color: index == 0
-                      ? const Color(0xFFE8C75D)
-                      : index == 1
-                          ? const Color(0xFF8B5E34)
-                          : const Color(0xFFB65B3A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      collection['icon'],
-                      style: const TextStyle(
-                        fontSize: 18,
+              return GestureDetector(
+                child: Container(
+                  width: 94,
+                  decoration: BoxDecoration(
+                    color: index == 0
+                        ? const Color(0xFFE8C75D)
+                        : index == 1
+                            ? const Color(0xFF8B5E34)
+                            : const Color(0xFFB65B3A),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        collection['icon'],
+                        style: const TextStyle(
+                          fontSize: 18,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      collection['name'],
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 7,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                      const SizedBox(height: 2),
+                      Text(
+                        collection['name'],
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 7,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -481,7 +512,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   // ------------------------------------------------------------
-  // POPULAR PRODUCTS
+  // SEARCH RESULTS
   // ------------------------------------------------------------
 
   Widget _buildPopularProducts() {
@@ -489,7 +520,7 @@ class _SearchScreenState extends State<SearchScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Popular right now',
+          'Search results',
           style: TextStyle(
             fontFamily: 'serif',
             fontSize: 12,
@@ -499,19 +530,86 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         const SizedBox(height: 8),
 
-        ..._products.map(
-          (product) => _buildPopularProductCard(product),
-        ),
+        if (_isLoadingProducts)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_productError != null)
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  _productError!,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.red,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () {
+                    final query =
+                        _recentSearches.isNotEmpty
+                            ? _recentSearches.first
+                            : '';
+
+                    if (query.isNotEmpty) {
+                      _performSearch(query);
+                    }
+                  },
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(fontSize: 9),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (_products.isEmpty)
+          const Text(
+            'Search for crafts to see products',
+            style: TextStyle(
+              fontSize: 8,
+              color: Color(0xFFAA927E),
+            ),
+          )
+        else
+          ..._products.map(
+            (product) => _buildPopularProductCard(product),
+          ),
       ],
     );
   }
 
+  // ------------------------------------------------------------
+  // PRODUCT CARD
+  // ------------------------------------------------------------
+
   Widget _buildPopularProductCard(
-    Map<String, String> product,
+    BuyerProduct product,
   ) {
+    String productName = 'Unnamed product';
+
+    if (product.productName['en'] != null) {
+      productName =
+          product.productName['en'].toString();
+    } else if (product.productName.isNotEmpty) {
+      productName =
+          product.productName.values.first.toString();
+    }
+
+    final artisanName =
+        product.artisan?.name ?? 'Unknown artisan';
+
     return GestureDetector(
       onTap: () {
-        context.push('/buyer-product-detail');
+        context.push(
+          '/buyer-product-detail',
+          extra: product.id,
+        );
       },
       child: Container(
         height: 67,
@@ -528,36 +626,31 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(7),
-              child: Image.network(
-                product['image']!,
-                width: 52,
-                height: 52,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) {
-                  return Container(
-                    width: 52,
-                    height: 52,
-                    color: const Color(0xFFE8D8C0),
-                    child: const Icon(
-                      Icons.image_outlined,
-                      size: 20,
-                      color: Color(0xFF9B7653),
-                    ),
-                  );
-                },
-              ),
+              child: product.imageUrl != null &&
+                      product.imageUrl!.isNotEmpty
+                  ? Image.network(
+                      product.imageUrl!,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return _imagePlaceholder();
+                      },
+                    )
+                  : _imagePlaceholder(),
             ),
-
             const SizedBox(width: 9),
-
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product['name']!,
+                    productName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 8.5,
                       fontWeight: FontWeight.w700,
@@ -566,7 +659,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'by ${product['artisan']}',
+                    'by $artisanName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 6.5,
                       color: Color(0xFF9A806A),
@@ -574,7 +669,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    product['price']!,
+                    product.category ?? 'Handcrafted',
                     style: const TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.bold,
@@ -584,33 +679,27 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-
-            Row(
-              children: [
-                const Icon(
-                  Icons.star,
-                  size: 10,
-                  color: Color(0xFFE89A17),
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  product['rating']!,
-                  style: const TextStyle(
-                    fontSize: 7,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF765944),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
+  Widget _imagePlaceholder() {
+    return Container(
+      width: 52,
+      height: 52,
+      color: const Color(0xFFE8D8C0),
+      child: const Icon(
+        Icons.image_outlined,
+        size: 20,
+        color: Color(0xFF9B7653),
+      ),
+    );
+  }
+
   // ------------------------------------------------------------
-  // BOTTOM NAV
+  // BOTTOM NAVIGATION
   // ------------------------------------------------------------
 
   Widget _buildBottomNavigation() {
@@ -634,7 +723,8 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceAround,
         children: List.generate(
           items.length,
           (index) {
@@ -644,6 +734,10 @@ class _SearchScreenState extends State<SearchScreen> {
               onTap: () {
                 if (index == 0) {
                   context.go('/buyer-home');
+                } else if (index == 3) {
+                  context.go('/buyer-orders');
+                } else if (index == 4) {
+                  context.go('/buyer-profile');
                 }
               },
               child: SizedBox(
