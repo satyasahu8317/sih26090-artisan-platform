@@ -94,7 +94,7 @@ export const verifyOtp = async (req, res, next) => {
       throw new Error('Invalid OTP');
     }
 
-    
+
     await prisma.user.update({
       where: { id: user.id },
       data: { otpHash: null, otpExpiresAt: null, otpAttempts: 0 },
