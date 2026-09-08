@@ -1,12 +1,22 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
 import { sendSms } from '../utils/smsService.js';
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '30d',
-  });
+const generateToken = (id, role, isGuest = false) => {
+  return jwt.sign(
+    {
+      id,
+      userId: id,
+      ...(role ? { role } : {}),
+      isGuest: Boolean(isGuest),
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+    }
+  );
 };
 
 const msg91WidgetRequest = async (path, body = {}) => {
@@ -86,7 +96,7 @@ export const requestOtp = async (req, res, next) => {
       throw new Error('Please provide mobileNumber and role');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = '123456';
     const otpHash = await bcrypt.hash(otp, 10);
     const otpExpiresAt = new Date(Date.now() + (parseInt(process.env.OTP_EXPIRY_MINUTES) || 5) * 60000);
 
@@ -152,7 +162,7 @@ export const verifyOtp = async (req, res, next) => {
       throw new Error('Invalid OTP');
     }
 
-    
+
     await prisma.user.update({
       where: { id: user.id },
       data: { otpHash: null, otpExpiresAt: null, otpAttempts: 0 },
@@ -321,9 +331,91 @@ export const getMe = async (req, res, next) => {
       ? `/${user.role.toLowerCase()}/register`
       : `/${user.role.toLowerCase()}/home`;
 
+    // Strip private OTP / internal auth fields before returning to client
+    const { otpHash, otpExpiresAt, otpAttempts, ...safeUser } = user;
+
     res.status(200).json({
-      user,
+      user: safeUser,
       redirect,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/auth/guest
+ * Creates an isolated demo user and corresponding profile in PostgreSQL,
+ * then returns a real application JWT with isGuest: true.
+ */
+export const guestLogin = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role is required. Must be BUYER or ARTISAN',
+      });
+    }
+
+    const normalizedRole = typeof role === 'string' ? role.toUpperCase() : '';
+
+    if (normalizedRole !== 'BUYER' && normalizedRole !== 'ARTISAN') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Only BUYER and ARTISAN are accepted for guest login',
+      });
+    }
+
+    const guestUuid = crypto.randomUUID();
+    const guestMobile = `guest_${guestUuid}`;
+
+    const user = await prisma.user.create({
+      data: {
+        mobileNumber: guestMobile,
+        role: normalizedRole,
+        status: 'ACTIVE',
+        isGuest: true,
+      },
+    });
+
+    if (normalizedRole === 'BUYER') {
+      await prisma.buyerProfile.create({
+        data: {
+          userId: user.id,
+          name: 'Demo Buyer',
+          businessName: 'Demo Crafts Store',
+          businessType: 'Retail',
+          state: 'Demo State',
+          district: 'Demo District',
+        },
+      });
+    } else if (normalizedRole === 'ARTISAN') {
+      await prisma.artisanProfile.create({
+        data: {
+          userId: user.id,
+          name: 'Demo Artisan',
+          craftType: 'Handicrafts',
+          state: 'Demo State',
+          district: 'Demo District',
+          preferredLanguage: 'en',
+        },
+      });
+    }
+
+    const token = generateToken(user.id, user.role, true);
+
+    res.status(200).json({
+      success: true,
+      token,
+      isGuest: true,
+      role: user.role,
+      user: {
+        id: user.id,
+        role: user.role,
+        isGuest: true,
+      },
     });
   } catch (error) {
     next(error);

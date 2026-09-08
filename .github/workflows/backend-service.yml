@@ -16,6 +16,12 @@ jobs:
       DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb?schema=public
       JWT_SECRET: ci_test_secret
+      B2_KEY_ID: ci_test_key_id
+      B2_APPLICATION_KEY: ci_test_application_key
+      B2_BUCKET_NAME: sihartisanmedia
+      B2_ENDPOINT: https://s3.us-east-005.backblazeb2.com
+      B2_REGION: us-east-005
+      B2_SIGNED_URL_EXPIRES_SECONDS: 3600
     defaults:
       run:
         working-directory: backend-service

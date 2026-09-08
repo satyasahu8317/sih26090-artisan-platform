@@ -375,6 +375,7 @@ This project's current build target is a hackathon demo, not a production launch
 - Image and text embeddings for similarity/comparable-product retrieval
 - Historical sales learning, price-feedback loops, vector search
 - The `AiProcessor` abstraction's `IndiaHostedProcessor` implementation (Section 9.2) — only matters if this becomes a real government-affiliated pilot
+<<<<<<< HEAD
 - **A real buyer-artisan matching/recommendation engine.** The "94% Match" score shown in UI mockups has no logic behind it today. If needed for the demo, the honest version is a transparent weighted rule-based score (category, region, price fit, capacity, delivery feasibility — see `SIH_PPT_ANSWERS.md` §1.2), not a trained model — there's no training data or user-behavior history to train one on anyway.
 
 **Product features intentionally out of scope**
@@ -388,3 +389,10 @@ This project's current build target is a hackathon demo, not a production launch
 - Category-inference fallback in `describe.py`, and reconciling the category enum across `mobile`/`backend-service`/`ml-service`
 - Offline-first sync (queued capture, exponential-backoff retry, idempotent backend creation to prevent duplicates) — `mobile`'s offline queue design (Section 8) isn't implemented yet
 - Admin/moderation panel and scheme-matching engine (Section 5's stretch goal) — both remain explicitly last-priority
+=======
+
+**Testing & architecture**
+- Router-level tests for `ml-service` (currently only pure-logic pieces like `pricing.py`/`jobs.py` are covered)
+- Blur/multi-object/no-clear-subject detection guard for `/image/enhance` (original spec asked for it, never built)
+- Category-inference fallback in `describe.py`, and reconciling the category enum across `mobile`/`backend-service`/`ml-service`
+>>>>>>> origin/master

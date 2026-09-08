@@ -12,6 +12,7 @@ app.get("/health", (_req, res) => {
 
 import aiRoutes from "./routes/aiRoutes.js";
 import artisanRoutes from "./routes/artisanRoutes.js";
+import buyerRoutes from "./routes/buyerRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
@@ -20,6 +21,7 @@ import orderRoutes from "./routes/orderRoutes.js";
 app.use("/api/auth", authRoutes);
 app.use("/api/v1/ai", aiRoutes);
 app.use("/api/v1/artisans", artisanRoutes);
+app.use("/api/v1/buyers", buyerRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/enquiries", enquiryRoutes);

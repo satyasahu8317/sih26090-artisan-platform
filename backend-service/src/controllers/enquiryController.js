@@ -346,3 +346,54 @@ export const addEnquiryMessage = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/v1/enquiries/my
+ * Returns the authenticated buyer's own enquiry list with artisan and product summaries.
+ */
+export const getMyEnquiries = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (user.role !== 'BUYER') {
+      res.status(403);
+      throw new Error('Only buyers can access their enquiry list');
+    }
+
+    const buyerProfile = await prisma.buyerProfile.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!buyerProfile) {
+      res.status(404);
+      throw new Error('Buyer profile not found');
+    }
+
+    const enquiries = await prisma.enquiry.findMany({
+      where: { buyerId: buyerProfile.id },
+      include: {
+        artisan: {
+          select: {
+            id: true,
+            name: true,
+            craftType: true,
+            state: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            productName: true,
+            imageUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.status(200).json({ success: true, data: enquiries });
+  } catch (error) {
+    next(error);
+  }
+};
+
