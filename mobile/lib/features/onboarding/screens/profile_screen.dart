@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../home/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../auth/providers/auth_provider.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController otherCraftController = TextEditingController();
 
@@ -41,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     FocusScope.of(context).unfocus();
 
     // STEP 1 - Name
@@ -90,17 +92,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // STEP 3 - Language
     if (currentStep == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
-      );
+      final name = nameController.text.trim().isNotEmpty
+          ? nameController.text.trim()
+          : 'Artisan';
+      final craft = (selectedCraft == 'Other'
+              ? otherCraftController.text.trim()
+              : selectedCraft) ??
+          'Handicrafts';
+      final lang = selectedLanguage;
+
+      // Persist to Neon PostgreSQL via PATCH /api/v1/artisans/me
+      await ref.read(authProvider.notifier).saveArtisanProfile({
+        'name': name,
+        'craftType': craft,
+        'preferredLanguage': lang,
+      });
+
+      if (mounted) {
+        context.go('/artisan/home');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
       body: SafeArea(
@@ -114,7 +131,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 40),
+                  if (authState.isGuest) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDEFD6),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFD2B48C)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, size: 16, color: Color(0xFF8B5E34)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Demo Guest Mode (Artisan)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF8B5E34),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              ref.read(authProvider.notifier).exitGuestMode();
+                              context.go('/role');
+                            },
+                            child: const Text(
+                              'Exit',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
 
                   // Profile icon
                   Container(

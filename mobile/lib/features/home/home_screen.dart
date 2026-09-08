@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../auth/providers/auth_provider.dart';
 import '../products/screens/add_product_screen.dart';
-class HomeScreen extends StatefulWidget {
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int selectedIndex = 0;
 
   final Color background = const Color(0xFFF6F1E7);
@@ -16,6 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
     return Scaffold(
       backgroundColor: background,
 
@@ -32,7 +38,55 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(),
+                        if (authState.isGuest)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFDEFD6),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFD2B48C)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.explore, size: 16, color: Color(0xFF8B5E34)),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Demo Mode (Artisan Experience)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF8B5E34),
+                                    ),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () {
+                                    ref.read(authProvider.notifier).exitGuestMode();
+                                    context.go('/role');
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'Exit Demo',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        _buildHeader(authState.guestName ?? 'Sita Devi'),
 
                         const SizedBox(height: 16),
 
@@ -75,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // HEADER
   // =========================================================
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String artisanName) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -94,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 2),
 
               Text(
-                'Sita Devi 👋',
+                '$artisanName 👋',
                 style: TextStyle(
                   fontSize: 26,
                   height: 1.15,

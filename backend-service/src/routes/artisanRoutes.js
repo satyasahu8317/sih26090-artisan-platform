@@ -1,5 +1,5 @@
 import express from 'express';
-import { getArtisanDashboard, getArtisanProfile, getArtisanOrders, getArtisanEnquiries, getPublicArtisanProfile } from '../controllers/artisanController.js';
+import { getArtisanDashboard, getArtisanProfile, getArtisanOrders, getArtisanEnquiries, getPublicArtisanProfile, updateArtisanProfile } from '../controllers/artisanController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(protect);
 router.get('/me/dashboard', getArtisanDashboard);
 router.get('/me', getArtisanProfile);
+router.patch('/me', updateArtisanProfile);
 router.get('/orders', getArtisanOrders);
 router.get('/enquiries', getArtisanEnquiries);
 
