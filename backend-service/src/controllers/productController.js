@@ -13,7 +13,6 @@ const createProductSchema = z.object({
   description: localizedStringSchema,
   tags: z.array(z.string()).default([]),
   imageUrl: z.string().url().optional().nullable(),
-  imageUrl: z.string().url().optional().nullable(),
   // status is ignored for creation, we force DRAFT
 });
 
@@ -25,6 +24,83 @@ const updateProductSchema = z.object({
   tags: z.array(z.string()).optional(),
   imageUrl: z.string().url().optional().nullable(),
 });
+
+/**
+ * GET /api/v1/products
+ * Public listing of PUBLISHED products with optional search, category filter, and pagination.
+ * Accessible to any authenticated user (buyer or artisan).
+ */
+export const getPublicProducts = async (req, res, next) => {
+  try {
+    const { q, category, page = '1', limit = '20' } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Base: only PUBLISHED products
+    const where = { status: 'PUBLISHED' };
+
+    if (q) {
+      // Search across text fields (case-insensitive) and JSON name fields (substring)
+      const searchOr = [
+        { category: { contains: q, mode: 'insensitive' } },
+        { material: { contains: q, mode: 'insensitive' } },
+        { productName: { path: ['en'], string_contains: q } },
+        { productName: { path: ['hi'], string_contains: q } },
+        { description: { path: ['en'], string_contains: q } },
+        { tags: { has: q } },
+      ];
+
+      if (category) {
+        // Both q and category: AND them together
+        where.AND = [
+          { category: { contains: category, mode: 'insensitive' } },
+          { OR: searchOr },
+        ];
+      } else {
+        where.OR = searchOr;
+      }
+    } else if (category) {
+      where.category = { contains: category, mode: 'insensitive' };
+    }
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: {
+          artisan: {
+            select: {
+              id: true,
+              name: true,
+              craftType: true,
+              state: true,
+              district: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.product.count({ where }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: products,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const getMyProducts = async (req, res, next) => {
   try {
@@ -108,6 +184,40 @@ export const createProduct = async (req, res, next) => {
 export const getProduct = async (req, res, next) => {
   try {
     const user = req.user;
+
+    // Buyer: can view any PUBLISHED product with public artisan summary
+    if (user.role === 'BUYER') {
+      const product = await prisma.product.findUnique({
+        where: {
+          id: req.params.id,
+        },
+        include: {
+          artisan: {
+            select: {
+              id: true,
+              name: true,
+              craftType: true,
+              state: true,
+              district: true,
+            },
+          },
+        },
+      });
+
+      if (!product) {
+        res.status(404);
+        throw new Error('Product not found');
+      }
+
+      if (product.status !== 'PUBLISHED') {
+        res.status(403);
+        throw new Error('Product not found or unauthorized');
+      }
+
+      return res.status(200).json({ success: true, data: product });
+    }
+
+    // Artisan: existing ownership-restricted behavior
     if (user.role !== 'ARTISAN') {
       res.status(403);
       throw new Error('Only artisans can access this route');
@@ -142,6 +252,7 @@ export const getProduct = async (req, res, next) => {
     next(error);
   }
 };
+
 
 export const updateProduct = async (req, res, next) => {
   try {

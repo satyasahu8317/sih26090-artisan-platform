@@ -346,3 +346,65 @@ export const markCompleted = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/v1/orders/my
+ * Returns the authenticated buyer's own orders with artisan and product summaries.
+ * Supports pagination via ?page and ?limit query params.
+ */
+export const getMyOrders = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'BUYER') {
+      res.status(403);
+      throw new Error('Only buyers can access their order list');
+    }
+
+    const buyerProfile = await prisma.buyerProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!buyerProfile) {
+      res.status(404);
+      throw new Error('Buyer profile not found');
+    }
+
+    const { page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const whereClause = { buyerId: buyerProfile.id };
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: whereClause,
+        include: {
+          artisan: {
+            select: { id: true, name: true, craftType: true },
+          },
+          product: {
+            select: { id: true, productName: true, imageUrl: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.order.count({ where: whereClause }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
