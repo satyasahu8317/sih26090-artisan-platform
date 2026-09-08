@@ -3,16 +3,24 @@ import crypto from 'crypto';
 import prisma from '../config/db.js';
 
 let razorpay;
-try {
-  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-    razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
+
+export const getRazorpayClient = () => {
+  if (!razorpay && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    try {
+      razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+      });
+    } catch (error) {
+      console.error("Failed to initialize Razorpay:", error);
+    }
   }
-} catch (error) {
-  console.error("Failed to initialize Razorpay:", error);
-}
+  return razorpay;
+};
+
+export const setRazorpayClient = (client) => {
+  razorpay = client;
+};
 
 export const createPayment = async (req, res, next) => {
   try {
@@ -83,7 +91,8 @@ export const createPayment = async (req, res, next) => {
     }
 
     // Need to create a new Razorpay order
-    if (!razorpay) {
+    const rzp = getRazorpayClient();
+    if (!rzp) {
       return res.status(500).json({ success: false, message: 'Razorpay is not configured on the server' });
     }
 
@@ -93,7 +102,7 @@ export const createPayment = async (req, res, next) => {
       receipt: `rcpt_${order.id.substring(0, 20)}`
     };
 
-    const rzpOrder = await razorpay.orders.create(options);
+    const rzpOrder = await rzp.orders.create(options);
 
     // Update the application order
     await prisma.order.update({

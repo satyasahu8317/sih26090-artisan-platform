@@ -1,26 +1,33 @@
-import { describe, it, before, after, mock } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import request from 'supertest';
 import app from '../src/app.js';
 import prisma from '../src/config/db.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { setRazorpayClient } from '../src/controllers/paymentController.js';
 
 describe('Payment API Tests', () => {
   let buyerToken, artisanToken, buyer2Token, buyerId, artisanId, buyer2Id;
   let buyerProfileId, buyer2ProfileId;
   let acceptedOrder, pendingOrder, rejectedOrder, partiallyAcceptedOrder;
   const originalEnv = process.env;
+  const testPhones = ['+9995551111', '+9995552222', '+9995553333'];
 
   before(async () => {
     process.env = { ...originalEnv, RAZORPAY_KEY_ID: 'test_key', RAZORPAY_KEY_SECRET: 'test_secret', JWT_SECRET: 'testsecret' };
 
+    await prisma.order.deleteMany({ where: { buyer: { user: { mobileNumber: { in: testPhones } } } } });
+    await prisma.buyerProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.artisanProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.user.deleteMany({ where: { mobileNumber: { in: testPhones } } });
+
     // Create users
-    const buyer = await prisma.user.create({ data: { mobileNumber: '1111111111', role: 'BUYER', status: 'ACTIVE' } });
+    const buyer = await prisma.user.create({ data: { mobileNumber: '+9995551111', role: 'BUYER', status: 'ACTIVE' } });
     buyerId = buyer.id;
-    const buyer2 = await prisma.user.create({ data: { mobileNumber: '3333333333', role: 'BUYER', status: 'ACTIVE' } });
+    const buyer2 = await prisma.user.create({ data: { mobileNumber: '+9995553333', role: 'BUYER', status: 'ACTIVE' } });
     buyer2Id = buyer2.id;
-    const artisan = await prisma.user.create({ data: { mobileNumber: '2222222222', role: 'ARTISAN', status: 'ACTIVE' } });
+    const artisan = await prisma.user.create({ data: { mobileNumber: '+9995552222', role: 'ARTISAN', status: 'ACTIVE' } });
     artisanId = artisan.id;
 
     const b1Profile = await prisma.buyerProfile.create({ data: { userId: buyerId, name: 'B1', businessName: 'B1', businessType: 'B', state: 'S', district: 'D' } });
@@ -48,25 +55,25 @@ describe('Payment API Tests', () => {
     });
 
     // Mock Razorpay
-    mock.module('razorpay', () => {
-      return class RazorpayMock {
-        constructor() {
-          this.orders = {
-            create: async (opts) => {
-              return { id: 'order_test_123', amount: opts.amount, currency: opts.currency };
-            }
-          };
+    let orderCount = 0;
+    setRazorpayClient({
+      orders: {
+        create: async (opts) => {
+          orderCount++;
+          const id = orderCount === 1 ? 'order_test_123' : `order_test_${orderCount}_${Date.now()}`;
+          return { id, amount: opts.amount, currency: opts.currency };
         }
-      };
+      }
     });
   });
 
   after(async () => {
     process.env = originalEnv;
-    await prisma.order.deleteMany({});
-    await prisma.buyerProfile.deleteMany({});
-    await prisma.artisanProfile.deleteMany({});
-    await prisma.user.deleteMany({});
+    setRazorpayClient(null);
+    await prisma.order.deleteMany({ where: { buyer: { user: { mobileNumber: { in: testPhones } } } } });
+    await prisma.buyerProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.artisanProfile.deleteMany({ where: { user: { mobileNumber: { in: testPhones } } } });
+    await prisma.user.deleteMany({ where: { mobileNumber: { in: testPhones } } });
   });
 
   it('should reject unauthenticated request', async () => {
