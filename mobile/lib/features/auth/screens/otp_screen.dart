@@ -1,15 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class OtpScreen extends StatefulWidget {
-  const OtpScreen({super.key});
+import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/auth_storage.dart';
+import '../../../core/network/auth_api.dart';
+
+class OtpScreen extends ConsumerStatefulWidget {
+  const OtpScreen({super.key, required this.phone, required this.reqId});
+
+  final String phone;
+  final String reqId;
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends ConsumerState<OtpScreen> {
   final List<TextEditingController> _controllers =
       List.generate(4, (_) => TextEditingController());
 
@@ -18,19 +26,28 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Timer? _timer;
   int _secondsRemaining = 8;
+  final AuthApi _authApi = AuthApi();
+  final AuthStorage _authStorage = AuthStorage();
+  late String _requestId;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _requestId = widget.reqId;
     _startTimer();
   }
 
   void _startTimer() {
     _timer?.cancel();
 
-    setState(() {
+    if (mounted) {
+      setState(() {
+        _secondsRemaining = 8;
+      });
+    } else {
       _secondsRemaining = 8;
-    });
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsRemaining > 0) {
@@ -55,6 +72,63 @@ class _OtpScreenState extends State<OtpScreen> {
 
   String get _otp {
     return _controllers.map((controller) => controller.text).join();
+  }
+
+  Future<void> _verifyOtp() async {
+    if (_otp.length != 4) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final widgetResponse = await _authApi.verifyOtp(
+        reqId: _requestId,
+        otp: _otp,
+      );
+        final accessToken = (widgetResponse['access-token'] ??
+            widgetResponse['accessToken'])
+          ?.toString();
+      if (accessToken == null || accessToken.isEmpty) {
+        throw const AuthApiException('MSG91 did not return an access token', null);
+      }
+
+      final appResponse = await _authApi.verifyAccessToken(accessToken);
+      final token = appResponse['token']?.toString();
+      final redirect = appResponse['redirect']?.toString();
+      if (token == null || token.isEmpty || redirect == null) {
+        throw const AuthApiException('The server returned an incomplete login response', null);
+      }
+
+      await _authStorage.saveToken(token);
+      ref.read(authTokenProvider.notifier).state = token;
+      if (!mounted) return;
+      context.go(redirect);
+    } on AuthApiException catch (error) {
+      if (mounted) {
+        _showMessage(error.message);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    if (_secondsRemaining > 0 || _isLoading) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _authApi.resendOtp(_requestId);
+      _startTimer();
+      _showMessage('A new OTP has been sent.');
+    } on AuthApiException catch (error) {
+      _showMessage(error.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -351,11 +425,7 @@ SizedBox(
   width: double.infinity,
   height: 56,
   child: ElevatedButton(
-    onPressed: _otp.length == 4
-        ? () {
-            context.go('/language');
-          }
-        : null,
+                    onPressed: _otp.length == 4 && !_isLoading ? _verifyOtp : null,
     style: ElevatedButton.styleFrom(
       backgroundColor: const Color(0xFF8B5E34),
       disabledBackgroundColor:
@@ -366,13 +436,22 @@ SizedBox(
         borderRadius: BorderRadius.circular(14),
       ),
     ),
-    child: const Text(
-      'Verify OTP →',
-      style: TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
+    child: _isLoading
+        ? const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
+        : const Text(
+            'Verify OTP →',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
   ),
 ),
               const SizedBox(height: 20),
@@ -429,7 +508,7 @@ SizedBox(
                     )
                   else
                     GestureDetector(
-                      onTap: _startTimer,
+                      onTap: _resendOtp,
                       child: const Text(
                         'now',
                         style: TextStyle(

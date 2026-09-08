@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/network/auth_api.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -9,11 +12,38 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final AuthApi _authApi = AuthApi();
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendOtp() async {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 10) {
+      _showMessage('Enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final reqId = await _authApi.sendOtp('91$digits');
+      if (!mounted) return;
+      context.go('/otp', extra: {'phone': digits, 'reqId': reqId});
+    } on AuthApiException catch (error) {
+      if (mounted) _showMessage(error.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -243,9 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 66,
                       child: ElevatedButton(
-                      onPressed: () {
-  context.go('/otp');
-},
+                      onPressed: _isLoading ? null : _sendOtp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF996735),
                           foregroundColor: Colors.white,
@@ -254,7 +282,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        child: const Text(
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
                           'Send OTP →',
                           style: TextStyle(
                             fontSize: 19,
