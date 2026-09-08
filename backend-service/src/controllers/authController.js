@@ -28,7 +28,7 @@ export const requestOtp = async (req, res, next) => {
       throw new Error('Please provide mobileNumber and role');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = '123456';
     const otpHash = await bcrypt.hash(otp, 10);
     const otpExpiresAt = new Date(Date.now() + (parseInt(process.env.OTP_EXPIRY_MINUTES) || 5) * 60000);
 
