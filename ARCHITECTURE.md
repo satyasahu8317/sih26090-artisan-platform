@@ -331,8 +331,14 @@ This section exists so nobody mistakes an architectural placeholder for a workin
 | ONDC integration | Concrete plan in Section 5 | Not yet implemented — `/ondc/webhook`, the catalog-to-Beckn mapping, and the reused `Order` flow all need building |
 | GeM (Government e-Marketplace) | Resolved plan in Section 5 (catalogue export, Phase 1) | Not yet implemented — the `Product`-to-GeM-package export function still needs building |
 | Amazon Karigar / Flipkart Samarth | Not integrated | Separate artisan seller-onboarding programs on those platforms; at most this app could pre-fill data for manual submission, not auto-create accounts |
-| `backend-service` business logic | `/health` only, real skeleton in place | Auth, catalog CRUD, orchestration, and the async job-status store (Section 9.4) are all still to be built |
-| `ml-service` business logic | `/image/enhance` and `/price/suggest` built synchronously; `/audio/transcribe`, `/text/translate`, `/text/generate-description` in progress | Async job pattern (Section 9.4) not yet wired into any endpoint — currently all synchronous |
+| `backend-service` business logic | Real auth (MSG91 OTP + JWT), `Product`/`Order`/`Enquiry` CRUD, and its own direct Groq-based AI routes are built and deployed | **Does not call `ml-service` at all** — zero references to it anywhere in `backend-service/src`. No `mlClient`, no orchestration, no async job-status store (Section 9.4) |
+| `ml-service` business logic | All 5 endpoints (`/image/enhance`, `/audio/transcribe`, `/text/translate`, `/text/generate-description`, `/price/suggest`) built, deployed, and verified working end-to-end with real photo/audio | Nothing in `backend-service` calls it yet (see row above) — a fully working service with no real caller |
+| Mobile ↔ backend auth integration | Real networking exists (`auth_api.dart`, `auth_storage.dart`) calling real backend OTP routes | `verifyAccessToken()` hardcodes `role: 'BUYER'` for every login, breaking the artisan flow; role-selection screen's Continue button has no navigation wired; OTP verify's access-token field lookup likely doesn't match MSG91's actual response shape — needs a live test |
+| Mobile capture → backend → `ml-service` pipeline | Camera/audio recording UI screens exist | No upload flow, no listing-creation call, no ML orchestration on the backend side to call into — the entire photo/voice-to-listing journey is not connected end to end, per direct code audit |
+| Buyer catalog UI | Screens exist (`my_catalog_screen.dart`, etc.) | Backed by hard-coded fixture data, not real `GET` calls; no public buyer-side discovery/search endpoint exists in `backend-service` either |
+| `Product` vs `Listing` schema | `backend-service` actually implements `Product` (with `Enquiry`/negotiation flow, per `API.md`) | This doc's data model (Section 7) still describes the original `Listing` design from the frozen contract — a real, undecided drift the team needs to resolve (keep `Product` and update this doc, or migrate to `Listing`) — not just a doc-staleness issue |
+| WhatsApp bot flow (Section 4) | Designed here in detail | No webhook verification, media ingestion, or relay implementation found in `backend-service` — fully unbuilt, not just partial |
+| Deployed services proven together | `backend-service` and `ml-service` are both independently deployed on Render | Never verified working together — no `ML_SERVICE_URL`/shared `INTERNAL_API_KEY` configured on either side yet, no end-to-end smoke test run against the live deployment |
 | Impact measurement (Section 6) | Data model field (`artisanBaselinePrice`, `sourceChannel`) specified | No aggregation endpoint or dashboard screen built yet |
 | Observability (Section 9.1) | Not implemented | No structured logging or correlation ids wired yet |
 | Data retention policy (Section 9.2) | Not decided | Needs an explicit retention window for raw PII before launch |
@@ -369,8 +375,24 @@ This project's current build target is a hackathon demo, not a production launch
 - Image and text embeddings for similarity/comparable-product retrieval
 - Historical sales learning, price-feedback loops, vector search
 - The `AiProcessor` abstraction's `IndiaHostedProcessor` implementation (Section 9.2) — only matters if this becomes a real government-affiliated pilot
+<<<<<<< HEAD
+- **A real buyer-artisan matching/recommendation engine.** The "94% Match" score shown in UI mockups has no logic behind it today. If needed for the demo, the honest version is a transparent weighted rule-based score (category, region, price fit, capacity, delivery feasibility — see `SIH_PPT_ANSWERS.md` §1.2), not a trained model — there's no training data or user-behavior history to train one on anyway.
+
+**Product features intentionally out of scope**
+- **Payment gateway** — no integration exists or is planned for the hackathon; frame any purchase flow as an enquiry/order request, not a completed transaction
+- **Maps / location services** — no geolocation, delivery-distance calculation, or map UI; location stays plain profile/catalog text for now
+
+**Testing & architecture**
+- Router-level tests for `ml-service` (currently only pure-logic pieces like `pricing.py`/`jobs.py` are covered)
+- A cross-service integration/smoke test covering the full upload → listing creation → ML orchestration → status polling → publish path, run against either local Docker or the real deployed services
+- Blur/multi-object/no-clear-subject detection guard for `/image/enhance` (original spec asked for it, never built)
+- Category-inference fallback in `describe.py`, and reconciling the category enum across `mobile`/`backend-service`/`ml-service`
+- Offline-first sync (queued capture, exponential-backoff retry, idempotent backend creation to prevent duplicates) — `mobile`'s offline queue design (Section 8) isn't implemented yet
+- Admin/moderation panel and scheme-matching engine (Section 5's stretch goal) — both remain explicitly last-priority
+=======
 
 **Testing & architecture**
 - Router-level tests for `ml-service` (currently only pure-logic pieces like `pricing.py`/`jobs.py` are covered)
 - Blur/multi-object/no-clear-subject detection guard for `/image/enhance` (original spec asked for it, never built)
 - Category-inference fallback in `describe.py`, and reconciling the category enum across `mobile`/`backend-service`/`ml-service`
+>>>>>>> origin/master
