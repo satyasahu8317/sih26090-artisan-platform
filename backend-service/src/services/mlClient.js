@@ -1,7 +1,8 @@
 
 
 const getMlConfig = () => {
-  const url = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+  const rawUrl = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+  const url = rawUrl.replace(/\/+$/, '');
   const apiKey = process.env.ML_INTERNAL_API_KEY;
   if (!apiKey) {
     console.warn('ML_INTERNAL_API_KEY is not set. Requests to protected ML endpoints will fail.');
