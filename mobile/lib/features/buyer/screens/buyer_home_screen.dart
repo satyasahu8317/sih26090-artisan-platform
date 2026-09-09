@@ -129,7 +129,7 @@ void _selectCategory(int index) {
         ),
         GestureDetector(
           onTap: () {
-           context.push('/buyer-notifications');
+       context.go('/buyer-notifications');
           },
           child: Container(
             width: 42,
@@ -162,7 +162,7 @@ void _selectCategory(int index) {
   Widget _buildSearchBar() {
     return GestureDetector(
       onTap: () {
-        context.push('/buyer-search');
+      context.go('/buyer-search');
       },
       child: Container(
         height: 52,
@@ -606,93 +606,91 @@ void _selectCategory(int index) {
   }
 
   // ---------------- BOTTOM NAV ----------------
+Widget _buildBottomNavigation() {
+  final items = [
+    (Icons.home_rounded, 'Home'),
+    (Icons.search_rounded, 'Search'),
+    (Icons.grid_view_rounded, 'Categories'),
+    (Icons.shopping_bag_rounded, 'Orders'),
+    (Icons.person_rounded, 'Profile'),
+  ];
 
-  Widget _buildBottomNavigation() {
-    final items = [
-      (Icons.home_rounded, 'Home'),
-      (Icons.search_rounded, 'Search'),
-      (Icons.grid_view_rounded, 'Categories'),
-      (Icons.shopping_bag_rounded, 'Orders'),
-      (Icons.person_rounded, 'Profile'),
-    ];
-
-    return Container(
-      height: 78,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6F1E7),
-        border: Border(
-          top: BorderSide(
-            color: Color(0xFFD2B48C),
-            width: 0.8,
-          ),
+  return Container(
+    height: 78,
+    decoration: const BoxDecoration(
+      color: Color(0xFFF6F1E7),
+      border: Border(
+        top: BorderSide(
+          color: Color(0xFFD2B48C),
+          width: 0.8,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(
-          items.length,
-          (index) {
-            final selected = selectedNav == index;
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: List.generate(
+        items.length,
+        (index) {
+          final selected = selectedNav == index;
 
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedNav = index;
-                });
-
-                if (index == 0) {
-                  context.go('/buyer-home');
-                } else if (index == 1) {
-                  context.push('/buyer-search');
-                } else if (index == 3) {
-                  context.push('/buyer-orders');
-                } else if (index == 4) {
-                  context.push('/buyer-profile');
-                }
-              },
-              child: SizedBox(
-                width: 62,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 50,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF8B5E34)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: Icon(
-                        items[index].$1,
-                        size: 22,
-                        color: selected
-                            ? Colors.white
-                            : const Color(0xFF9A6C43),
-                      ),
+          return GestureDetector(
+            onTap: () {
+              if (index == 0) {
+                context.go('/buyer-home');
+              } else if (index == 1) {
+                context.go('/buyer-search');
+              } else if (index == 2) {
+                // Categories route is not available yet.
+                // Keep category section on Home for now.
+                return;
+              } else if (index == 3) {
+                context.go('/buyer-orders');
+              } else if (index == 4) {
+                context.go('/buyer-profile');
+              }
+            },
+            child: SizedBox(
+              width: 62,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 50,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFF8B5E34)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      items[index].$2,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: selected
-                            ? const Color(0xFF8B5E34)
-                            : const Color(0xFF9A806A),
-                      ),
+                    child: Icon(
+                      items[index].$1,
+                      size: 22,
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF9A6C43),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    items[index].$2,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w400,
+                      color: selected
+                          ? const Color(0xFF8B5E34)
+                          : const Color(0xFF9A806A),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
 }
+      }

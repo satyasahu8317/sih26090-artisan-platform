@@ -19,7 +19,7 @@ class BuyerOrdersScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+      onPressed: () => context.go('/buyer-home'),
         ),
         title: const Text(
           'My Orders',

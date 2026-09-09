@@ -4,10 +4,13 @@ import 'package:sih26090_mobile/core/routes/app_routes.dart';
 import 'package:sih26090_mobile/core/localization/locale_provider.dart';
 import 'package:sih26090_mobile/l10n/generated/app_localizations.dart';
 
+import 'package:sih26090_mobile/core/storage/session_storage.dart';
 
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
+  await SessionStorage.init();
 
-void main() {
   runApp(
     const ProviderScope(
       child: KalaMitrApp(),

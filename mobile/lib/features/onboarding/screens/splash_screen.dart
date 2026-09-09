@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../../l10n/generated/app_localizations.dart';
-
+import '../../../core/storage/session_storage.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -19,28 +19,25 @@ class _SplashScreenState extends State<SplashScreen> {
     _startSessionCheck();
   }
 
-  Future<void> _startSessionCheck() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
 
-    try {
-      final session = await AuthRepository.verifyStoredSession();
-      if (!mounted) return;
+Future<void> _startSessionCheck() async {
+  await Future<void>.delayed(const Duration(seconds: 2));
+  if (!mounted) return;
 
-      if (session == null) {
-        context.go('/language');
-      } else if (session.role == 'ARTISAN') {
-        context.go('/home');
-      } else {
-        context.go('/buyer-home');
-      }
-    } on AuthSessionException {
-      if (mounted) context.go('/login');
-    } on AuthException {
-      if (mounted) context.go('/language');
+  if (SessionStorage.isLoggedIn) {
+    final role = SessionStorage.role;
+
+    if (role == 'ARTISAN') {
+      context.go('/home');
+    } else if (role == 'BUYER') {
+      context.go('/buyer-home');
+    } else {
+      context.go('/language');
     }
+  } else {
+    context.go('/language');
   }
-
+}
   @override
   void dispose() {
     super.dispose();

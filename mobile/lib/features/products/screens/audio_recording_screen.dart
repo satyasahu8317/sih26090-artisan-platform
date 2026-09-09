@@ -11,10 +11,13 @@ class AudioRecordingScreen extends StatefulWidget {
       _AudioRecordingScreenState();
 }
 
-class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
+class _AudioRecordingScreenState extends State<AudioRecordingScreen>
+    with WidgetsBindingObserver {
   final AudioRecorder _audioRecorder = AudioRecorder();
 
   bool isRecording = false;
+  bool isStarting = false;
+  bool _permissionReady = false;
   String? audioPath;
 
   Duration recordingDuration = Duration.zero;
@@ -34,45 +37,115 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
     return '$minutes:$seconds';
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Resolve mic permission up front, BEFORE the user taps anything.
+    // This avoids triggering the OS permission dialog (and the
+    // Activity pause/resume it causes) during the actual recording
+    // interaction, which is what was tripping the router redirect.
+    _prewarmPermission();
+  }
+
+  Future<void> _prewarmPermission() async {
+    try {
+      final granted = await _audioRecorder.hasPermission();
+      if (!mounted) return;
+      setState(() {
+        _permissionReady = granted;
+      });
+
+      if (!granted) {
+        debugPrint('MIC PERMISSION NOT GRANTED ON SCREEN LOAD');
+      }
+    } catch (e, st) {
+      debugPrint('PERMISSION PREWARM ERROR: $e');
+      debugPrint('$st');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Diagnostic only — leave this in for your demo day in case you
+    // need to prove (via logcat / debug console) whether a lifecycle
+    // change is happening at all when you tap the mic.
+    debugPrint('AudioRecordingScreen lifecycle: $state');
+  }
+
   // ─────────────────────────────────────
   // START RECORDING
   // ─────────────────────────────────────
 
   Future<void> _startRecording() async {
+    if (isStarting || isRecording) return;
+
+    setState(() {
+      isStarting = true;
+    });
+
     try {
-      final hasPermission = await _audioRecorder.hasPermission();
+      // Permission was already resolved in initState in the common
+      // case, so this call should return immediately without showing
+      // any OS dialog. If it wasn't granted, this is the one place a
+      // dialog can still appear.
+      final hasPermission =
+          _permissionReady || await _audioRecorder.hasPermission();
+
+      if (!mounted) return;
 
       if (!hasPermission) {
-        if (!mounted) return;
+        setState(() {
+          isStarting = false;
+        });
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Microphone permission is required.',
-            ),
+            content: Text('Microphone permission is required.'),
           ),
         );
 
         return;
       }
 
-   await _audioRecorder.start(
-  const RecordConfig(
-    encoder: AudioEncoder.aacLc,
-  ),
-  path: 'kalamitr_${DateTime.now().millisecondsSinceEpoch}.m4a',
-);
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+        ),
+        path: 'kalamitr_${DateTime.now().millisecondsSinceEpoch}.m4a',
+      );
 
       if (!mounted) return;
 
       setState(() {
-  isRecording = true;
-  recordingDuration = Duration.zero;
-});
+        isStarting = false;
+        isRecording = true;
+        recordingDuration = Duration.zero;
+        audioPath = null;
+      });
 
       _startTimer();
-    } catch (e) {
-      debugPrint('Recording start error: $e');
+
+      debugPrint('RECORDING STARTED SUCCESSFULLY');
+    } catch (e, stackTrace) {
+      debugPrint('RECORDING START ERROR: $e');
+      debugPrint('STACK TRACE: $stackTrace');
+
+      _timer?.cancel();
+
+      if (!mounted) return;
+
+      setState(() {
+        isStarting = false;
+        isRecording = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to start recording: $e'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -81,10 +154,14 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
   // ─────────────────────────────────────
 
   Future<void> _stopRecording() async {
+    if (!isRecording) return;
+
     try {
       final path = await _audioRecorder.stop();
 
       _timer?.cancel();
+
+      debugPrint('Recording stopped. Path: $path');
 
       if (!mounted) return;
 
@@ -92,8 +169,26 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
         isRecording = false;
         audioPath = path;
       });
-    } catch (e) {
-      debugPrint('Recording stop error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('RECORDING STOP ERROR: $e');
+      debugPrint('RECORDING STOP STACK TRACE: $stackTrace');
+
+      _timer?.cancel();
+
+      if (!mounted) return;
+
+      setState(() {
+        isRecording = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to stop recording: $e',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -102,6 +197,8 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
   // ─────────────────────────────────────
 
   Future<void> _toggleRecording() async {
+    if (isStarting) return;
+
     if (isRecording) {
       await _stopRecording();
     } else {
@@ -119,7 +216,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
     _timer = Timer.periodic(
       const Duration(seconds: 1),
       (_) {
-        if (!mounted) return;
+        if (!mounted || !isRecording) return;
 
         setState(() {
           recordingDuration += const Duration(seconds: 1);
@@ -133,14 +230,21 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
   // ─────────────────────────────────────
 
   Future<void> _reRecord() async {
-    if (isRecording) {
-      await _stopRecording();
+    try {
+      if (isRecording) {
+        await _stopRecording();
+      }
+    } catch (e) {
+      debugPrint('RE-RECORD ERROR: $e');
     }
 
     _timer?.cancel();
 
+    if (!mounted) return;
+
     setState(() {
       isRecording = false;
+      isStarting = false;
       recordingDuration = Duration.zero;
       audioPath = null;
     });
@@ -172,6 +276,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _audioRecorder.dispose();
     super.dispose();
@@ -185,7 +290,6 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E7),
-
       body: SafeArea(
         child: Column(
           children: [
@@ -219,9 +323,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 16),
-
                   const Expanded(
                     child: Text(
                       'Tell us about your\nproduct',
@@ -242,9 +344,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
 
             // EXAMPLE
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(
@@ -261,8 +361,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                   ),
                 ),
                 child: const Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Example / उदाहरण:',
@@ -272,9 +371,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                         color: Color(0xFF8B5E34),
                       ),
                     ),
-
                     SizedBox(height: 6),
-
                     Text(
                       '“यह जयपुर की हाथ से बनी नीली मिट्टी की फूलदान है...”',
                       maxLines: 2,
@@ -294,9 +391,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
 
             // WAVEFORM PLACEHOLDER
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Container(
                 height: 72,
                 width: double.infinity,
@@ -342,11 +437,13 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                   const SizedBox(height: 8),
 
                   Text(
-                    isRecording
-                        ? 'Recording... Tap microphone to stop'
-                        : audioPath != null
-                            ? 'Recording complete'
-                            : 'Tap microphone to start',
+                    isStarting
+                        ? 'Starting microphone...'
+                        : isRecording
+                            ? 'Recording... Tap microphone to stop'
+                            : audioPath != null
+                                ? 'Recording complete'
+                                : 'Tap microphone to start',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 12,
@@ -356,13 +453,11 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
 
                   const SizedBox(height: 28),
 
-                  // REAL MIC BUTTON
+                  // MIC BUTTON
                   GestureDetector(
-                    onTap: _toggleRecording,
+                    onTap: isStarting ? null : _toggleRecording,
                     child: AnimatedContainer(
-                      duration: const Duration(
-                        milliseconds: 200,
-                      ),
+                      duration: const Duration(milliseconds: 200),
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
@@ -379,13 +474,18 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                           ),
                         ],
                       ),
-                      child: Icon(
-                        isRecording
-                            ? Icons.stop
-                            : Icons.mic,
-                        color: const Color(0xFFFFFCF5),
-                        size: 48,
-                      ),
+                      child: isStarting
+                          ? const CircularProgressIndicator(
+                              color: Color(0xFFFFFCF5),
+                              strokeWidth: 3,
+                            )
+                          : Icon(
+                              isRecording
+                                  ? Icons.stop
+                                  : Icons.mic,
+                              color: const Color(0xFFFFFCF5),
+                              size: 48,
+                            ),
                     ),
                   ),
                 ],
@@ -406,7 +506,7 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                     child: SizedBox(
                       height: 63,
                       child: OutlinedButton(
-                        onPressed: audioPath == null
+                        onPressed: audioPath == null || isStarting
                             ? null
                             : _reRecord,
                         style: OutlinedButton.styleFrom(
@@ -444,7 +544,9 @@ class _AudioRecordingScreenState extends State<AudioRecordingScreen> {
                       height: 63,
                       child: ElevatedButton(
                         onPressed:
-                            audioPath == null || isRecording
+                            audioPath == null ||
+                                    isRecording ||
+                                    isStarting
                                 ? null
                                 : _done,
                         style: ElevatedButton.styleFrom(

@@ -48,14 +48,72 @@ class AuthRepository {
       isNewUser: response['isNewUser'] == true,
       redirect: response['redirect'] as String?,
     );
-  }
+  }static Future<AuthResult> requestMockOtp({
+  required String mobileNumber,
+  required String role,
+}) async {
+  try {
+    final response = await AuthApi.requestMockOtp(
+      mobileNumber: mobileNumber,
+      role: role,
+    );
 
+    print('MOCK OTP REQUEST RESPONSE: $response');
+
+    return const AuthResult(
+      token: '',
+      isNewUser: false,
+      redirect: null,
+    );
+  } on DioException catch (e) {
+    print('MOCK OTP REQUEST ERROR: ${e.response?.statusCode}');
+    print('MOCK OTP REQUEST ERROR DATA: ${e.response?.data}');
+    print('MOCK OTP REQUEST ERROR MESSAGE: ${e.message}');
+
+    throw AuthException(_mapDioError(e));
+  }
+}
+static Future<AuthResult> verifyMockOtp({
+  required String mobileNumber,
+  required String otp,
+  required String role,
+}) async {
+  try {
+    final response = await AuthApi.verifyMockOtp(
+      mobileNumber: mobileNumber,
+      otp: otp,
+      role: role,
+    );
+
+    print('MOCK OTP VERIFY RESPONSE: $response');
+
+    final token = response['token'];
+
+    if (token is! String || token.isEmpty) {
+      throw const AuthException(
+        'Authentication token was not returned by server.',
+      );
+    }
+
+    await TokenStorage.saveToken(token);
+
+    return AuthResult(
+      token: token,
+      isNewUser: response['isNewUser'] == true,
+      redirect: response['redirect'] as String?,
+    );
+  } on DioException catch (e) {
+    print('MOCK OTP ERROR: ${e.response?.data}');
+    throw AuthException(_mapDioError(e));
+  }
+}
   static Future<AuthSession?> verifyStoredSession() async {
     final token = await TokenStorage.getToken();
     if (token == null || token.isEmpty) return null;
 
     try {
       final response = await AuthApi.getMe();
+      print('ME API RESPONSE: $response');
       final data = response['data'];
       final user = data is Map ? data['user'] : null;
       final role = user is Map ? user['role'] : null;

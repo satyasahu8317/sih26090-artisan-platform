@@ -15,12 +15,33 @@ class ArtisanRepository {
       responseData['data'] as Map<String, dynamic>,
     );
   }
+Future<ArtisanProfile> getProfile() async {
+  final response = await _client.get('/api/v1/artisans/me');
 
-  Future<ArtisanProfile> getProfile() async {
-    final response = await _client.get('/api/v1/artisans/me');
-    final responseData = response.data as Map<String, dynamic>;
+  final responseData = Map<String, dynamic>.from(
+    response.data as Map,
+  );
+
+  final rawData = responseData['data'];
+
+  if (rawData is! Map) {
+    throw Exception('Artisan profile data not found');
+  }
+
+  final data = Map<String, dynamic>.from(rawData);
+
+  // Backend response may be:
+  // data: { artisanProfile: {...} }
+  // OR
+  // data: {...}
+  final profileData = data['artisanProfile'];
+
+  if (profileData is Map) {
     return ArtisanProfile.fromJson(
-      responseData['data']['artisanProfile'] as Map<String, dynamic>,
+      Map<String, dynamic>.from(profileData),
     );
   }
+
+  return ArtisanProfile.fromJson(data);
+}
 }

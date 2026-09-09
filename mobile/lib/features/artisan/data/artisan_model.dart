@@ -28,7 +28,9 @@ class ArtisanDashboardProfile {
     required this.craftType,
   });
 
-  factory ArtisanDashboardProfile.fromJson(Map<String, dynamic> json) {
+  factory ArtisanDashboardProfile.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return ArtisanDashboardProfile(
       name: json['name'] as String,
       craftType: json['craftType'] as String,
@@ -51,12 +53,17 @@ class ArtisanDashboardSummary {
     required this.unreadNotificationsCount,
   });
 
-  factory ArtisanDashboardSummary.fromJson(Map<String, dynamic> json) {
+  factory ArtisanDashboardSummary.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return ArtisanDashboardSummary(
       productCount: (json['productCount'] as num).toInt(),
-      publishedProductCount: (json['publishedProductCount'] as num).toInt(),
-      pendingOrdersCount: (json['pendingOrdersCount'] as num).toInt(),
-      newEnquiriesCount: (json['newEnquiriesCount'] as num).toInt(),
+      publishedProductCount:
+          (json['publishedProductCount'] as num).toInt(),
+      pendingOrdersCount:
+          (json['pendingOrdersCount'] as num).toInt(),
+      newEnquiriesCount:
+          (json['newEnquiriesCount'] as num).toInt(),
       unreadNotificationsCount:
           (json['unreadNotificationsCount'] as num).toInt(),
     );
@@ -78,13 +85,43 @@ class ArtisanProfile {
     required this.preferredLanguage,
   });
 
-  factory ArtisanProfile.fromJson(Map<String, dynamic> json) {
+  factory ArtisanProfile.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    String readString(
+      String key, {
+      String fallback = '',
+    }) {
+      final value = json[key];
+
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
+
+      return fallback;
+    }
+
     return ArtisanProfile(
-      name: json['name'] as String,
-      craftType: json['craftType'] as String,
-      state: json['state'] as String,
-      district: json['district'] as String,
-      preferredLanguage: json['preferredLanguage'] as String,
+      name: readString(
+        'name',
+        fallback: 'Artisan',
+      ),
+      craftType: readString(
+        'craftType',
+        fallback: 'Artisan',
+      ),
+      state: readString(
+        'state',
+        fallback: 'India',
+      ),
+      district: readString(
+        'district',
+        fallback: '',
+      ),
+      preferredLanguage: readString(
+        'preferredLanguage',
+        fallback: 'English',
+      ),
     );
   }
 }
